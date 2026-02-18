@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>配置</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <style>
+      /* 视频模型配置区域样式 */
+      .video-model-section {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+      }
+      .video-model-section .config-title {
+        color: #2196F3;
+      }
+      .video-model-input {
+        width: 100%;
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: monospace;
+      }
+      .video-model-input:focus {
+        border-color: #2196F3;
+        outline: none;
+      }
+      .video-model-help {
+        margin-top: 10px;
+        padding: 10px;
+        background: #f5f5f5;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #666;
+      }
+      .video-model-help code {
+        background: #e0e0e0;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="title">配置</div>
+        <div class="project-actions">
+          <button id="backHome">返回主页</button>
+        </div>
+      </header>
+      <div class="project-content">
+        <div class="tab-panel">
+          <!-- 鉴权与连接配置 -->
+          <div class="config-header">
+            <div class="config-title">鉴权与连接配置</div>
+            <div class="config-actions">
+              <button id="reloadAuthConfig">刷新</button>
+              <button id="saveAuthConfig">保存</button>
+              <button id="resetAuthConfig">重置覆盖</button>
+              <div id="authConfigStatus" class="status-inline hidden"></div>
+            </div>
+          </div>
+          <div class="config-table-wrap">
+            <table class="data-table" id="authConfigTable">
+              <thead>
+                <tr>
+                  <th>阶段</th>
+                  <th>配置项</th>
+                  <th>当前值</th>
+                  <th>来源</th>
+                  <th>默认值</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          
+          <!-- 视频模型配置 -->
+          <div class="video-model-section">
+            <div class="config-header">
+              <div class="config-title">视频模型配置</div>
+              <div class="config-actions">
+                <button id="reloadVideoModelConfig">刷新</button>
+                <button id="saveVideoModelConfig">保存</button>
+                <button id="resetVideoModelConfig">重置</button>
+                <div id="videoModelConfigStatus" class="status-inline hidden"></div>
+              </div>
+            </div>
+            <div class="config-table-wrap">
+              <table class="data-table" id="videoModelConfigTable">
+                <thead>
+                  <tr>
+                    <th>配置项</th>
+                    <th>当前值</th>
+                    <th>来源</th>
+                    <th>说明</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="video-model-help">
+              <strong>提示：</strong>视频模型端点ID可从火山引擎ARK平台获取，格式为 <code>ep-YYYYMMDD-xxxxx</code>。<br>
+              配置保存后立即生效，无需重启服务。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="/static/auth_config.js"></script>
+  </body>
+</html>

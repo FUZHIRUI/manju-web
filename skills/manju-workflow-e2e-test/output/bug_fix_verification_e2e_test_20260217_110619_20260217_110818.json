@@ -1,0 +1,73 @@
+{
+  "project": "e2e_test_20260217_110619",
+  "test_name": "Bug修复验证 - phase1中间态保持测试",
+  "total_checks": 1,
+  "phase1_changed": false,
+  "test_passed": true,
+  "intermediate_checks": [
+    {
+      "check_index": 1,
+      "timestamp": "2026-02-17T11:08:18.802979",
+      "phase1_status": "completed",
+      "phase2_status": "completed",
+      "flow_status": "completed",
+      "phase1_unchanged": true,
+      "phase2_running": false,
+      "raw_status": {
+        "project": "e2e_test_20260217_110619",
+        "updated_at": 1771297649.1241548,
+        "flows": {
+          "auto_storyboard": {
+            "status": "completed",
+            "steps": {
+              "phase1": "completed",
+              "phase2": "completed",
+              "upload": "completed"
+            }
+          },
+          "visual_audio_assets": {
+            "status": "waiting",
+            "steps": {
+              "download_assets": "waiting",
+              "build_prompts": "waiting",
+              "generate_images": "waiting",
+              "generate_tts": "waiting",
+              "upload_assets": "waiting",
+              "character_prompts": "waiting",
+              "character_images": "waiting",
+              "location_prompts": "waiting",
+              "fenjing_prompts": "waiting",
+              "location_images": "waiting",
+              "cloth_images": "waiting",
+              "cloth_changed": "waiting",
+              "tts": "waiting"
+            }
+          },
+          "fenjing": {
+            "status": "waiting",
+            "steps": {
+              "download_assets": "waiting",
+              "generate_images": "waiting",
+              "upload_assets": "waiting"
+            }
+          },
+          "video": {
+            "status": "waiting",
+            "steps": {
+              "prepare": "waiting",
+              "phase1_video_prompts": "waiting",
+              "phase2_video_generation": "waiting",
+              "fenjing_video_upload": "waiting"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "phase1_always_completed": true,
+    "total_check_count": 1,
+    "final_phase1_status": "completed",
+    "final_phase2_status": "completed"
+  }
+}

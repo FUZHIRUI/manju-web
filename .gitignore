@@ -1,0 +1,30 @@
+# General
+.DS_Store
+*.log
+*.tmp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.env
+
+# Node/Frontend
+node_modules/
+dist/
+
+# Project artifacts
+backend/logs/
+backend/manju_output/
+.playwright-browsers/
+.pytest_cache/
+**/.pytest_cache/
+
+# Auth-related docs and secrets
+backend/config/global_auth.json
+
+# Misc
+frontend/.cache/
+*.bak

@@ -1,0 +1,116 @@
+{
+  "default": {
+    "max_attempts": 3,
+    "base_backoff_ms": 2000,
+    "max_backoff_ms": 30000,
+    "timeout_ms": 600000
+  },
+  "policies": {
+    "ark_llm": {
+      "max_attempts": 3,
+      "error_retryable_map": {
+        "network": true,
+        "timeout": true,
+        "rate_limit": true,
+        "risk_control": true,
+        "server_error": true,
+        "non_retryable": false
+      },
+      "risk_rule_ref": "ark_risk"
+    },
+    "ark_vlm": {
+      "max_attempts": 3,
+      "error_retryable_map": {
+        "network": true,
+        "timeout": true,
+        "rate_limit": true,
+        "risk_control": true,
+        "server_error": true,
+        "non_retryable": false
+      },
+      "risk_rule_ref": "ark_risk"
+    },
+    "image_generation": {
+      "max_attempts": 3,
+      "error_retryable_map": {
+        "network": true,
+        "timeout": true,
+        "rate_limit": true,
+        "risk_control": true,
+        "server_error": true,
+        "non_retryable": false
+      },
+      "risk_rule_ref": "ark_risk"
+    },
+    "video_task_create": {
+      "max_attempts": 3,
+      "error_retryable_map": {
+        "network": true,
+        "timeout": true,
+        "rate_limit": true,
+        "risk_control": true,
+        "server_error": true,
+        "non_retryable": false
+      },
+      "risk_rule_ref": "ark_risk"
+    },
+    "video_task_poll": {
+      "max_attempts": 3,
+      "error_retryable_map": {
+        "network": true,
+        "timeout": true,
+        "rate_limit": true,
+        "risk_control": true,
+        "server_error": true,
+        "non_retryable": false
+      },
+      "risk_rule_ref": "ark_risk"
+    },
+    "tts": {
+      "max_attempts": 3,
+      "error_retryable_map": {
+        "network": true,
+        "timeout": true,
+        "rate_limit": true,
+        "risk_control": true,
+        "server_error": true,
+        "non_retryable": false
+      },
+      "tts_code_map_ref": "tts_30xx"
+    }
+  },
+  "risk_rules": {
+    "ark_risk": {
+      "cooldown_ms": 60000,
+      "max_attempts": 2,
+      "codes": [
+        "InputTextRiskDetection",
+        "InputImageRiskDetection",
+        "OutputTextRiskDetection",
+        "OutputImageRiskDetection",
+        "ContentSecurityDetectionError",
+        "SensitiveContentDetected",
+        "SensitiveContentDetected.SevereViolation",
+        "SensitiveContentDetected.Violence",
+        "InputTextSensitiveContentDetected",
+        "InputImageSensitiveContentDetected",
+        "InputVideoSensitiveContentDetected",
+        "OutputTextSensitiveContentDetected",
+        "OutputImageSensitiveContentDetected",
+        "OutputVideoSensitiveContentDetected",
+        "TooManyRequests"
+      ],
+      "finish_reason": ["content_filter"],
+      "code_field_paths": ["error.code", "error.type", "error.Code", "error.Type"],
+      "message_keywords": ["RiskDetection", "SensitiveContentDetected", "content_filter"]
+    }
+  },
+  "tts_code_maps": {
+    "tts_30xx": {
+      "3000": "rate_limit",
+      "3001": "timeout",
+      "3002": "server_error",
+      "3099": "non_retryable"
+    }
+  }
+}

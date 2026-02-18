@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TTZ 剧本工作台</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="title">TTZ 剧本工作台</div>
+        <div class="project-actions" id="homeActions">
+          <input id="projectName" placeholder="项目名，例如 ms2" />
+          <button id="createProject">新建项目</button>
+        </div>
+        <div class="project-actions">
+          <button id="openAuthConfig">配置</button>
+        </div>
+      </header>
+      <div id="homeView" class="home-view">
+        <section class="panel">
+          <h2>项目列表</h2>
+          <div class="list" id="projectList"></div>
+        </section>
+      </div>
+      <div id="projectView" class="project-view hidden">
+        <div class="project-header">
+          <button id="backHome">返回项目列表</button>
+          <div class="project-title" id="projectTitle"></div>
+        </div>
+        <div class="project-main-tabs">
+          <button class="tab" data-main-tab="batch">批量生成</button>
+          <button class="tab active" data-main-tab="characters">角色图</button>
+          <button class="tab" data-main-tab="cloth-changed">角色换装图</button>
+          <button class="tab" data-main-tab="cloth">服装图</button>
+          <button class="tab" data-main-tab="locations">场景图</button>
+          <button class="tab" data-main-tab="storyboards">章节分镜</button>
+          <button class="tab" data-main-tab="videos">章节视频</button>
+          <button class="tab" data-main-tab="tables">剧本数据表</button>
+        </div>
+        <div class="project-content">
+          <div id="tabBatch" class="tab-panel hidden">
+            <div class="batch-flow">
+              <div class="batch-title">批量生成</div>
+              <div class="batch-sequence">步骤：剧本拆解 → 角色与素材生成 → 分镜图生成 → 视频生成</div>
+              <div class="flow-buttons">
+                <button data-flow="auto_storyboard">剧本拆解</button>
+                <button data-flow="visual_audio_assets">角色与素材生成</button>
+                <button data-flow="fenjing_generate">分镜图生成</button>
+                <button data-flow="video">视频生成</button>
+              </div>
+              </div>
+            </div>
+          </div>
+          <div id="tabCharacters" class="tab-panel">
+            <div class="storyboard-layout character-layout">
+              <div class="storyboard-left">
+                <div id="characterList" class="asset-list"></div>
+              </div>
+              <div class="storyboard-right">
+                <div id="characterTitle" class="status-tag hidden"></div>
+                <div id="characterPreview" class="preview-box character-preview"></div>
+                <div class="prompt-block">
+                  <div class="label">角色提示词</div>
+                  <textarea id="characterPromptInput" class="prompt-text" rows="6"></textarea>
+                  <div class="prompt-actions">
+                    <button id="saveCharacterPrompt">保存提示词</button>
+                  </div>
+                </div>
+                <div class="prompt-actions">
+                  <button id="regenCharacterDetail">重生角色图</button>
+                  <button id="publishCharacterImage">上传角色图</button>
+                  <button id="deleteCharacterCandidate">删除候选图</button>
+                  <div id="characterPublishStatus" class="status-inline hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="tabClothChanged" class="tab-panel hidden">
+            <div class="storyboard-layout character-layout">
+              <div class="storyboard-left">
+                <div id="clothChangedList" class="asset-list"></div>
+              </div>
+              <div class="storyboard-right">
+                <div id="clothChangedTitle" class="status-tag hidden"></div>
+                <div id="clothChangedPreview" class="preview-box character-preview"></div>
+                <div class="prompt-block">
+                  <div class="label">换装提示词</div>
+                  <textarea id="clothChangedPromptInput" class="prompt-text" rows="6"></textarea>
+                  <div class="prompt-actions">
+                    <button id="saveClothChangedPrompt">保存提示词</button>
+                  </div>
+                </div>
+                <div class="prompt-actions">
+                  <button id="regenClothChangedDetail">重生换装图</button>
+                  <button id="publishClothChangedImage">上传换装图</button>
+                  <button id="deleteClothChangedCandidate">删除候选图</button>
+                  <div id="clothChangedPublishStatus" class="status-inline hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="tabCloth" class="tab-panel hidden">
+            <div class="asset-list" id="clothAssets"></div>
+          </div>
+          <div id="tabLocations" class="tab-panel hidden">
+            <div class="storyboard-layout character-layout">
+              <div class="storyboard-left">
+                <div id="locationList" class="asset-list location-list"></div>
+              </div>
+              <div class="storyboard-right">
+                <div id="locationTitle" class="status-tag hidden"></div>
+                <div id="locationPreview" class="preview-box location-preview"></div>
+              </div>
+            </div>
+          </div>
+          <div id="tabStoryboards" class="tab-panel hidden">
+            <div class="storyboard-layout">
+              <div class="storyboard-left">
+                <div class="tab-bar" id="chapterTabs"></div>
+                <div id="fenjingList" class="asset-list"></div>
+              </div>
+              <div class="storyboard-right">
+                <div class="prompt-block">
+                  <div class="label">参考图</div>
+                  <div id="fenjingRefs" class="asset-list"></div>
+                </div>
+                <div id="fenjingTitle" class="status-tag hidden"></div>
+                <div id="fenjingPreview" class="preview-box"></div>
+                <div class="prompt-block">
+                  <div class="label">分镜提示词</div>
+                  <textarea id="fenjingPromptInput" class="prompt-text" rows="6"></textarea>
+                  <div class="prompt-actions">
+                    <button id="saveFenjingPrompt">保存提示词</button>
+                  </div>
+                </div>
+                <div class="prompt-actions">
+                  <button id="regenFenjingDetail">重生分镜图</button>
+                  <button id="publishFenjingImage">上传分镜图</button>
+                  <button id="deleteFenjingCandidate">删除候选图</button>
+                  <div id="fenjingPublishStatus" class="status-inline hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="tabVideos" class="tab-panel hidden">
+            <div class="storyboard-layout">
+              <div class="storyboard-left">
+                <div class="tab-bar" id="videoChapterTabs"></div>
+                <div id="videoList" class="asset-list"></div>
+              </div>
+              <div class="storyboard-right">
+                <div class="prompt-block">
+                  <div class="label">参考图</div>
+                  <div id="videoRefs" class="asset-list"></div>
+                </div>
+                <div id="videoTitle" class="status-tag hidden"></div>
+                <div id="videoPreview" class="preview-box"></div>
+                <div class="prompt-block">
+                  <div class="label">TTS音频</div>
+                  <div class="audio-player">
+                    <label class="audio-sync">
+                      <input id="syncVideoTts" type="checkbox" checked />
+                      <span>视频播放时同步TTS</span>
+                    </label>
+                    <button id="playTtsAudio" class="play-button">播放</button>
+                    <div class="audio-progress">
+                      <div class="progress-bar">
+                        <div class="progress-fill" id="ttsAudioProgress"></div>
+                      </div>
+                      <div class="time-display">
+                        <span id="ttsCurrentTime">0:00</span>
+                        <span>/</span>
+                        <span id="ttsDuration">0:00</span>
+                      </div>
+                    </div>
+                    <audio id="ttsAudioPlayer" style="display: none;"></audio>
+                  </div>
+                </div>
+                <div class="prompt-block">
+                  <div class="label">视频提示词</div>
+                  <textarea id="videoPromptInput" class="prompt-text" rows="6"></textarea>
+                  <div class="prompt-actions">
+                    <button id="saveVideoPrompt">保存提示词</button>
+                  </div>
+                </div>
+                <div class="prompt-actions">
+                  <select id="videoModelSelect" class="model-select">
+                    <option value="1.5">模型 1.5</option>
+                    <option value="1.0">模型 1.0</option>
+                  </select>
+                  <button id="regenVideoDetail">重生视频</button>
+                  <button id="publishVideo">上传视频替换</button>
+                  <button id="deleteVideoCandidate">删除候选视频</button>
+                  <div id="videoPublishStatus" class="status-inline hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="tabTables" class="tab-panel hidden">
+            <div class="tab-bar" id="tableTabs">
+              <button class="tab active" data-tab="characters">角色表</button>
+              <button class="tab" data-tab="locations">地点表</button>
+              <button class="tab" data-tab="storyboards">故事板表</button>
+            </div>
+            <div class="tab-content">
+              <div id="tableCharacters"></div>
+              <div id="tableLocations" class="hidden"></div>
+              <div id="tableStoryboards" class="hidden">
+                <div class="tab-bar" id="storyboardTableTabs"></div>
+                <div id="tableStoryboardsBody"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="log-modal hidden" id="logModal">
+          <div class="log-modal-content">
+            <div class="log-modal-header">
+              <span class="log-modal-title">任务日志</span>
+              <button class="log-modal-close" id="logModalClose">&times;</button>
+            </div>
+            <div class="log-modal-body">
+              <div class="log-filter">
+                <label>筛选步骤：</label>
+                <select id="logStepFilter">
+                  <option value="">全部</option>
+                  <option value="auto_storyboard">剧本拆解</option>
+                  <option value="visual_audio_assets">角色与素材生成</option>
+                  <option value="fenjing">分镜图生成</option>
+                  <option value="video">视频生成</option>
+                </select>
+              </div>
+              <div class="log-content" id="logContent"></div>
+            </div>
+          </div>
+        </div>
+        <div class="project-bottom">
+          <div class="panel">
+            <div class="panel-header-row">
+              <h2>任务状态</h2>
+              <button class="stats-toggle-btn" onclick="toggleAssetStatsPanel()">生图统计</button>
+            </div>
+            <div id="failedFilterBar"></div>
+            <div class="list" id="jobList"></div>
+          </div>
+          <div class="panel stats-panel-container hidden" id="assetStatsPanel">
+            <div class="stats-tabs">
+              <button class="stats-tab active" data-tab="overview" onclick="switchStatsTab('overview')">总体统计</button>
+              <button class="stats-tab" data-tab="jobs" onclick="switchStatsTab('jobs')">任务历史</button>
+            </div>
+            <div class="stats-content" id="statsContent"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
