@@ -120,19 +120,11 @@ def _resolve_flow_steps(workflow: str, phase: Optional[str]) -> list:
     if workflow == "visual_audio_assets":
         return status_service.resolve_visual_audio_steps(str(phase or "all"))
     if workflow == "fenjing":
-        token = str(phase or "").strip().lower()
-        if token == "generate_images":
-            return ["generate_images"]
-        elif token == "upload_assets":
-            return ["upload_assets"]
-        elif token == "download_assets":
-            return ["download_assets"]
-        else:
-            return ["download_assets", "generate_images", "upload_assets"]
+        return ["download_assets"]
     if workflow == "fenjing_generate":
-        return ["generate_images"]
+        return ["download_assets"]
     if workflow == "fenjing_upload":
-        return ["upload_assets"]
+        return ["upload_fenjing_images"]
     if workflow == "video":
         return ["prepare"]
     return []
@@ -244,26 +236,25 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
                 {"phase": phase},
             )
         elif workflow == "fenjing":
-            phase = str(body.get("phase", "all")).strip().lower()
             job = job_service.start_job(
                 "run_fenjing",
                 project,
-                lambda job_id, p=phase: workflow_service.run_fenjing(job_id, project, phase=p),
-                {"phase": phase},
+                lambda job_id: workflow_service.run_fenjing(job_id, project),
+                {},
             )
         elif workflow == "fenjing_generate":
             job = job_service.start_job(
-                "run_fenjing",
+                "run_fenjing_generate",
                 project,
-                lambda job_id: workflow_service.run_fenjing(job_id, project, phase="generate_images"),
-                {"phase": "generate_images"},
+                lambda job_id: workflow_service.run_fenjing_generate(job_id, project),
+                {},
             )
         elif workflow == "fenjing_upload":
             job = job_service.start_job(
-                "run_fenjing",
+                "run_fenjing_upload",
                 project,
-                lambda job_id: workflow_service.run_fenjing(job_id, project, phase="upload_assets"),
-                {"phase": "upload_assets"},
+                lambda job_id: workflow_service.run_fenjing_upload(job_id, project),
+                {},
             )
         else:
             # 启动视频生成阶段
@@ -282,19 +273,14 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
                 reset_steps = False
                 status_service.reset_flow_steps(project, workflow, steps)
         elif workflow == "auto_storyboard":
+            # 当只运行特定phase时，只重置当前phase的步骤，保留其他phase的状态
             token = str(phase_value or "").strip().lower()
+            # 支持新的 step 命名和旧的 phase 命名
             if token in {"phase1", "phase2", "step1", "step2", "step3_upload"}:
                 reset_steps = False
                 status_service.reset_flow_steps(project, workflow, steps)
-        elif workflow == "fenjing":
-            token = str(phase_value or "").strip().lower()
-            if token in {"generate_images", "upload_assets"}:
-                reset_steps = False
-        elif workflow in {"fenjing_generate", "fenjing_upload"}:
-            reset_steps = False
-        actual_flow = status_service.WORKFLOW_TO_FLOW_MAP.get(workflow, workflow)
-        status_service.mark_flow_running(project, actual_flow, steps, reset_steps=reset_steps)
-        _schedule_job_timeout(job.get("id", ""), project, actual_flow, steps)
+        status_service.mark_flow_running(project, workflow, steps, reset_steps=reset_steps)
+        _schedule_job_timeout(job.get("id", ""), project, workflow, steps)
         send_json(handler, HTTPStatus.OK, job)
         return True
     if path.startswith("/api/projects/") and path.endswith("/regenerate/character"):
