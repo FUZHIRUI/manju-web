@@ -334,81 +334,72 @@ def run_visual_audio_assets(job_id: str, project: str, phase: str = "all") -> No
             stage_limiter.release()
 
 
-def run_fenjing(job_id: str, project: str, phase: str = "all") -> None:
-    """
-    统一的分镜工作流执行函数
-    
-    Args:
-        job_id: 任务ID
-        project: 项目名称
-        phase: 执行阶段，可选 "generate_images", "upload_assets", "all"
-    """
+def run_fenjing(job_id: str, project: str) -> None:
     job = job_repo.get_job(job_id)
     if not job:
         return
     log_path = job_repo.resolve_log_path(str(job["log_path"]))
-    job_repo.log_event("INFO", "run_fenjing_start", trace_id=job["trace_id"], job_id=job_id, project=project, phase=phase)
+    job_repo.log_event("INFO", "run_fenjing_start", trace_id=job["trace_id"], job_id=job_id, project=project)
     stage_limiter = throttle_service.acquire_stage_limit("fenjing")
     try:
         with ThreadLogRedirector(log_path):
             try:
                 load_manju_context(project)
-                
-                if phase in ("all", "generate_images"):
-                    job_repo.log_event("INFO", "run_fenjing_generate_phase_start", trace_id=job["trace_id"], job_id=job_id, project=project)
-                    call_with_project(fenjing.run_fenjing_generate_workflow, project_name=project)
-                    try:
-                        results = asset_repo.build_fenjing_asset_results(job_id, project)
-                        asset_repo.append_asset_results(project, results)
-                        summary = asset_repo.aggregate_partial_failures(results)
-                        success_count = sum(1 for item in results if item.get("status") == "success")
-                        if not results or success_count == 0:
-                            job_repo.update_job(job_id, status="error", error="fenjing_generate_output_empty")
-                            status_service.mark_flow_error(project, "fenjing", ["generate_images"])
-                            job_repo.log_event(
-                                "ERROR",
-                                "fenjing_generate_output_empty",
-                                trace_id=job["trace_id"],
-                                job_id=job_id,
-                                project=project,
-                                flow="fenjing",
-                            )
-                            return
-                        if summary.get("partial_failed"):
-                            status_service.update_step_partial(project, "fenjing", "generate_images")
-                        else:
-                            status_service.mark_step_completed(project, "fenjing", "generate_images")
-                    except Exception as exc:
-                        job_repo.update_job(job_id, status="error", error=str(exc))
+                call_with_project(fenjing.run_fenjing_workflow_multi, project_name=project)
+                try:
+                    results = asset_repo.build_fenjing_asset_results(job_id, project)
+                    asset_repo.append_asset_results(project, results)
+                    summary = asset_repo.aggregate_partial_failures(results)
+                    success_count = sum(1 for item in results if item.get("status") == "success")
+                    if not results or success_count == 0:
+                        job_repo.update_job(job_id, status="error", error="fenjing_output_empty")
                         status_service.mark_flow_error(project, "fenjing", ["generate_images"])
                         job_repo.log_event(
                             "ERROR",
-                            "asset_results_build_error",
+                            "fenjing_output_empty",
                             trace_id=job["trace_id"],
                             job_id=job_id,
                             project=project,
                             flow="fenjing",
-                            error=str(exc),
                         )
                         return
-                
-                if phase in ("all", "upload_assets"):
-                    job_repo.log_event("INFO", "run_fenjing_upload_phase_start", trace_id=job["trace_id"], job_id=job_id, project=project)
-                    call_with_project(fenjing.run_fenjing_upload_workflow, project_name=project)
-                    status_service.mark_step_completed(project, "fenjing", "upload_assets")
-                
-                job_repo.update_job(job_id, status="success")
-                job_repo.log_event("INFO", "run_fenjing_success", trace_id=job["trace_id"], job_id=job_id, project=project, phase=phase)
+                    job_repo.update_job(
+                        job_id,
+                        status="success",
+                        partial_failed=summary.get("partial_failed", False),
+                        partial_failed_count=summary.get("partial_failed_count", 0),
+                        partial_failed_types=summary.get("partial_failed_types", []),
+                    )
+                    if summary.get("partial_failed"):
+                        status_service.update_step_partial(project, "fenjing", "generate_images")
+                        status_service.mark_flow_partial(project, "fenjing")
+                    else:
+                        status_service.mark_flow_completed(project, "fenjing")
+                except Exception as exc:
+                    job_repo.update_job(job_id, status="error", error=str(exc))
+                    status_service.mark_flow_error(project, "fenjing", ["generate_images"])
+                    job_repo.log_event(
+                        "ERROR",
+                        "asset_results_build_error",
+                        trace_id=job["trace_id"],
+                        job_id=job_id,
+                        project=project,
+                        flow="fenjing",
+                        error=str(exc),
+                    )
+                    return
+                job_repo.log_event("INFO", "run_fenjing_success", trace_id=job["trace_id"], job_id=job_id)
                 return
             except Exception as exc:
                 import sys, traceback
                 error_msg = f"{str(exc)}\n{traceback.format_exc()}"
+                # 直接写入原始stderr，绕过ThreadLogRedirector
                 sys.__stderr__.write(f"=== FENJING ERROR ===\n")
                 sys.__stderr__.write(error_msg)
                 sys.__stderr__.write(f"\n=====================\n")
                 sys.__stderr__.flush()
                 job_repo.update_job(job_id, status="error", error=str(exc))
-                status_service.mark_flow_error(project, "fenjing", ["generate_images", "upload_assets"])
+                status_service.mark_flow_error(project, "fenjing", ["generate_images"])
                 job_repo.log_event("ERROR", "run_fenjing_error", trace_id=job["trace_id"], job_id=job_id, error=str(exc))
     finally:
         if stage_limiter:
@@ -416,13 +407,105 @@ def run_fenjing(job_id: str, project: str, phase: str = "all") -> None:
 
 
 def run_fenjing_generate(job_id: str, project: str) -> None:
-    """运行分镜生成工作流（已废弃，请使用 run_fenjing(phase="generate_images")）"""
-    run_fenjing(job_id, project, phase="generate_images")
+    job = job_repo.get_job(job_id)
+    if not job:
+        return
+    log_path = job_repo.resolve_log_path(str(job["log_path"]))
+    job_repo.log_event("INFO", "run_fenjing_generate_start", trace_id=job["trace_id"], job_id=job_id, project=project)
+    stage_limiter = throttle_service.acquire_stage_limit("fenjing")
+    try:
+        with ThreadLogRedirector(log_path):
+            try:
+                load_manju_context(project)
+                call_with_project(fenjing.run_fenjing_generate_workflow, project_name=project)
+                try:
+                    results = asset_repo.build_fenjing_asset_results(job_id, project)
+                    asset_repo.append_asset_results(project, results)
+                    summary = asset_repo.aggregate_partial_failures(results)
+                    success_count = sum(1 for item in results if item.get("status") == "success")
+                    if not results or success_count == 0:
+                        job_repo.update_job(job_id, status="error", error="fenjing_generate_output_empty")
+                        status_service.mark_flow_error(project, "fenjing_generate", ["generate_images"])
+                        job_repo.log_event(
+                            "ERROR",
+                            "fenjing_generate_output_empty",
+                            trace_id=job["trace_id"],
+                            job_id=job_id,
+                            project=project,
+                            flow="fenjing_generate",
+                        )
+                        return
+                    job_repo.update_job(
+                        job_id,
+                        status="success",
+                        partial_failed=summary.get("partial_failed", False),
+                        partial_failed_count=summary.get("partial_failed_count", 0),
+                        partial_failed_types=summary.get("partial_failed_types", []),
+                    )
+                    if summary.get("partial_failed"):
+                        status_service.update_step_partial(project, "fenjing_generate", "generate_images")
+                        status_service.mark_flow_partial(project, "fenjing_generate")
+                    else:
+                        status_service.mark_flow_completed(project, "fenjing_generate")
+                except Exception as exc:
+                    job_repo.update_job(job_id, status="error", error=str(exc))
+                    status_service.mark_flow_error(project, "fenjing_generate", ["generate_images"])
+                    job_repo.log_event(
+                        "ERROR",
+                        "asset_results_build_error",
+                        trace_id=job["trace_id"],
+                        job_id=job_id,
+                        project=project,
+                        flow="fenjing_generate",
+                        error=str(exc),
+                    )
+                    return
+                job_repo.log_event("INFO", "run_fenjing_generate_success", trace_id=job["trace_id"], job_id=job_id)
+                return
+            except Exception as exc:
+                import sys, traceback
+                error_msg = f"{str(exc)}\n{traceback.format_exc()}"
+                sys.__stderr__.write(f"=== FENJING_GENERATE ERROR ===\n")
+                sys.__stderr__.write(error_msg)
+                sys.__stderr__.write(f"\n=====================\n")
+                sys.__stderr__.flush()
+                job_repo.update_job(job_id, status="error", error=str(exc))
+                status_service.mark_flow_error(project, "fenjing_generate", ["generate_images"])
+                job_repo.log_event("ERROR", "run_fenjing_generate_error", trace_id=job["trace_id"], job_id=job_id, error=str(exc))
+    finally:
+        if stage_limiter:
+            stage_limiter.release()
 
 
 def run_fenjing_upload(job_id: str, project: str) -> None:
-    """运行分镜上传工作流（已废弃，请使用 run_fenjing(phase="upload_assets")）"""
-    run_fenjing(job_id, project, phase="upload_assets")
+    job = job_repo.get_job(job_id)
+    if not job:
+        return
+    log_path = job_repo.resolve_log_path(str(job["log_path"]))
+    job_repo.log_event("INFO", "run_fenjing_upload_start", trace_id=job["trace_id"], job_id=job_id, project=project)
+    stage_limiter = throttle_service.acquire_stage_limit("fenjing")
+    try:
+        with ThreadLogRedirector(log_path):
+            try:
+                load_manju_context(project)
+                call_with_project(fenjing.run_fenjing_upload_workflow, project_name=project)
+                status_service.mark_flow_completed(project, "fenjing_upload")
+                job_repo.update_job(job_id, status="success")
+                job_repo.log_event("INFO", "run_fenjing_upload_success", trace_id=job["trace_id"], job_id=job_id)
+                return
+            except Exception as exc:
+                import sys, traceback
+                error_msg = f"{str(exc)}\n{traceback.format_exc()}"
+                sys.__stderr__.write(f"=== FENJING_UPLOAD ERROR ===\n")
+                sys.__stderr__.write(error_msg)
+                sys.__stderr__.write(f"\n=====================\n")
+                sys.__stderr__.flush()
+                job_repo.update_job(job_id, status="error", error=str(exc))
+                status_service.mark_flow_error(project, "fenjing_upload", ["upload_fenjing_images"])
+                job_repo.log_event("ERROR", "run_fenjing_upload_error", trace_id=job["trace_id"], job_id=job_id, error=str(exc))
+    finally:
+        if stage_limiter:
+            stage_limiter.release()
 
 
 def run_video(job_id: str, project: str) -> None:
