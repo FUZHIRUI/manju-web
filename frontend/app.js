@@ -53,7 +53,7 @@ const state = {
   flowStatusPolling: null,
 };
 
-const STAGE_TYPES = ["auto_storyboard", "visual_audio_assets", "fenjing_generate", "video"];
+const STAGE_TYPES = ["auto_storyboard", "visual_audio_assets", "fenjing", "video"];
 const JOB_CACHE_PREFIX = "manju_jobs_cache_";
 const FLOW_TOUCHED_KEY = "manju_flow_touched";
 
@@ -514,10 +514,8 @@ function formatJobType(type) {
   const map = {
     run_auto_storyboard: "剧本拆解",
     run_visual_audio_assets: "角色与素材生成",
-  run_fenjing: "分镜图生成",
-  run_fenjing_generate: "分镜图生成",
-  run_fenjing_upload: "上传分镜图",
-  run_video: "视频生成",
+    run_fenjing: "分镜图生成",
+    run_video: "视频生成",
     regenerate_character: "重生角色图",
     regenerate_cloth: "重生服装图",
     regenerate_cloth_changed: "重生换装图",
@@ -952,8 +950,9 @@ function appendFenjingPhaseButtons(job, container) {
   const disabled = job && job.status === "running";
   const flowState = state.flowStatus?.flows;
   
-  const generateStatus = flowState?.fenjing_generate?.status || "waiting";
-  const uploadStatus = flowState?.fenjing_upload?.status || "waiting";
+  const fenjingFlow = flowState?.fenjing;
+  const generateStatus = fenjingFlow?.steps?.generate_images || "waiting";
+  const uploadStatus = fenjingFlow?.steps?.upload_assets || "waiting";
   
   const generateCompleted = generateStatus === "completed" || generateStatus === "partial_completed";
   const generateRunning = generateStatus === "running";
@@ -970,26 +969,24 @@ function appendFenjingPhaseButtons(job, container) {
   
   appendTreeAction(container, generateLabel, generateActionLabel, () => {
     if (generateCompleted) return;
-    executeFlowFull("fenjing_generate");
+    executeFlowFull("fenjing", { phase: "generate_images" });
   }, { disabled: isPending ? false : generateDisabled, breathing: generateRunning });
   
-  if (generateCompleted) {
-    const uploadCompleted = uploadStatus === "completed";
-    const uploadRunning = uploadStatus === "running";
-    const uploadDisabled = disabled || uploadRunning || uploadCompleted;
-    const uploadLabel = uploadCompleted ? "第二步：上传 ✓" : "第二步：上传";
-    let uploadActionLabel = "执行";
-    if (uploadRunning) {
-      uploadActionLabel = "执行中";
-    } else if (uploadCompleted) {
-      uploadActionLabel = "已完成";
-    }
-    
-    appendTreeAction(container, uploadLabel, uploadActionLabel, () => {
-      if (uploadCompleted) return;
-      executeFlowFull("fenjing_upload");
-    }, { disabled: uploadDisabled, breathing: uploadRunning });
+  const uploadCompleted = uploadStatus === "completed";
+  const uploadRunning = uploadStatus === "running";
+  const uploadDisabled = disabled || uploadRunning || uploadCompleted;
+  const uploadLabel = uploadCompleted ? "第二步：上传 ✓" : "第二步：上传";
+  let uploadActionLabel = "执行";
+  if (uploadRunning) {
+    uploadActionLabel = "执行中";
+  } else if (uploadCompleted) {
+    uploadActionLabel = "已完成";
   }
+  
+  appendTreeAction(container, uploadLabel, uploadActionLabel, () => {
+    if (uploadCompleted) return;
+    executeFlowFull("fenjing", { phase: "upload_assets" });
+  }, { disabled: uploadDisabled, breathing: uploadRunning });
 }
 
 function appendVideoPhaseButtons(job, container) {
@@ -1154,7 +1151,7 @@ function updateTreeActions(job, container) {
       });
     }
   }
-  if (flow === "fenjing_generate") {
+  if (flow === "fenjing") {
     appendFenjingPhaseButtons(job, wrap);
   }
   if (flow === "video") {
@@ -2142,63 +2139,6 @@ const FLOW_TREE_CONFIG = {
     fallbackStart: ["fenjing workflow start"],
     stepAliases: { error: "generate_images" }
   },
-  fenjing_generate: {
-    title: "分镜图生成",
-    steps: [
-      {
-        id: "download_assets",
-        label: "下载资产",
-        desc: "下载提示词与参考图",
-        startEvents: [{ event: "fenjing_generate_start" }, { event: "phase_start", phase: "phase_download_assets" }],
-        completeEvents: [{ event: "phase_complete", phase: "phase_download_assets" }],
-        fallbackStart: ["download_assets"],
-        fallbackComplete: ["phase_download_assets completed"],
-        errorPatterns: ["download_assets", "characters.jsonl", "location_prompts.jsonl"]
-      },
-      {
-        id: "generate_images",
-        label: "生成分镜图",
-        desc: "分镜图生成到本地",
-        startEvents: [
-          { event: "phase_start", phase: "phase_generate_images" },
-          { event: "step_progress", step: "generate_images" }
-        ],
-        completeEvents: [{ event: "fenjing_generate_complete" }],
-        fallbackStart: ["fenjing_image_start", "fenjing_image_attempt"],
-        fallbackComplete: ["fenjing_generate completed"],
-        errorPatterns: ["fenjing", "generate_images", "chapter"]
-      },
-      {
-        id: "upload_fenjing_images",
-        label: "上传分镜图",
-        desc: "上传分镜图到云存储",
-        startEvents: [{ event: "fenjing_upload_start" }],
-        completeEvents: [{ event: "fenjing_upload_complete" }],
-        fallbackStart: ["fenjing_upload start"],
-        fallbackComplete: ["fenjing_upload completed"],
-        errorPatterns: ["upload", "uploaded"]
-      }
-    ],
-    fallbackStart: ["fenjing_generate workflow start"],
-    stepAliases: { error: "generate_images" }
-  },
-  fenjing_upload: {
-    title: "上传分镜图",
-    steps: [
-      {
-        id: "upload_fenjing_images",
-        label: "上传到 TOS",
-        desc: "上传分镜图到云存储",
-        startEvents: [{ event: "fenjing_upload_start" }],
-        completeEvents: [{ event: "fenjing_upload_complete" }],
-        fallbackStart: ["fenjing_upload start"],
-        fallbackComplete: ["fenjing_upload completed"],
-        errorPatterns: ["upload", "uploaded"]
-      }
-    ],
-    fallbackStart: ["fenjing_upload workflow start"],
-    stepAliases: { error: "upload_fenjing_images" }
-  },
   video: {
     title: "视频生成",
     steps: [
@@ -2282,9 +2222,6 @@ function getPartialCompletedSteps(flow) {
 }
 
 function shouldRenderFlowCard(flow) {
-  if (flow === "fenjing_upload") {
-    return false;
-  }
   const status = getFlowStatus(flow);
   if (["pending", "running", "completed", "error", "partial_completed", "partial_returned"].includes(status)) {
     return true;
@@ -2731,15 +2668,10 @@ function updateTreeDiagramGeneric(flow, logs, events, config, container) {
   connectors.forEach((connector) => {
     connector.className = "tree-connector";
   });
+  // 获取 flow 对应的步骤状态，兼容 workflow 到 flow 的映射
   let flowSteps = (state.flowStatus && state.flowStatus.flows && state.flowStatus.flows[flow])
     ? state.flowStatus.flows[flow].steps || {}
     : {};
-  if (flow === "fenjing_generate") {
-    const uploadSteps = (state.flowStatus && state.flowStatus.flows && state.flowStatus.flows.fenjing_upload)
-      ? state.flowStatus.flows.fenjing_upload.steps || {}
-      : {};
-    flowSteps = Object.assign({}, flowSteps, uploadSteps);
-  }
   const useFlowStatus = Object.keys(flowSteps).length > 0;
   if (!useFlowStatus) {
     config.steps.forEach((step) => {
@@ -2828,9 +2760,9 @@ function renderJobs() {
     const item = document.createElement("div");
     item.className = "job-item";
     let effectiveStatus = job.status || "";
-    if (group.stageType === "fenjing_generate") {
-      const uploadFlowStatus = state.flowStatus && state.flowStatus.flows && state.flowStatus.flows.fenjing_upload;
-      if (uploadFlowStatus && uploadFlowStatus.status === "running") {
+    if (group.stageType === "fenjing") {
+      const fenjingFlowStatus = state.flowStatus && state.flowStatus.flows && state.flowStatus.flows.fenjing;
+      if (fenjingFlowStatus && fenjingFlowStatus.status === "running") {
         effectiveStatus = "running";
       }
     }
@@ -3704,7 +3636,7 @@ function isAssetGenerating(assetType) {
   const map = {
     character: { flow: "visual_audio_assets", steps: ["character_images"], regenJobs: ["regenerate_character"] },
     location: { flow: "visual_audio_assets", steps: ["location_images"], regenJobs: ["regenerate_location_image"] },
-    fenjing: { flow: "fenjing_generate", steps: ["generate_images", "upload_fenjing_images"], regenJobs: ["regenerate_fenjing"] },
+    fenjing: { flow: "fenjing", steps: ["generate_images", "upload_assets"], regenJobs: ["regenerate_fenjing"] },
     video: { flow: "video", steps: ["phase2_video_generation"], regenJobs: ["regenerate_video"] },
     cloth: { flow: "visual_audio_assets", steps: ["cloth_images"], regenJobs: ["regenerate_cloth"] },
     cloth_changed: { flow: "visual_audio_assets", steps: ["cloth_images"], regenJobs: ["regenerate_cloth_changed"] }
@@ -3717,12 +3649,7 @@ function isAssetGenerating(assetType) {
   if (stepRunning) {
     return true;
   }
-  if (assetType === "fenjing") {
-    const uploadFlowStatus = state.flowStatus && state.flowStatus.flows && state.flowStatus.flows.fenjing_upload;
-    if (uploadFlowStatus && uploadFlowStatus.status === "running") {
-      return true;
-    }
-  }
+  // fenjing 使用统一的 flow，无需单独检查 upload flow
   const jobs = Array.isArray(state.jobs) ? state.jobs : [];
   const regenJobs = config.regenJobs || [];
   if (regenJobs.length === 0 || jobs.length === 0) {
@@ -3736,7 +3663,7 @@ function getBatchFlowStatus(data) {
     return {
       auto_storyboard: false,
       visual_audio_assets: false,
-      fenjing_generate: false,
+      fenjing: false,
       video: false,
     };
   }
@@ -3756,7 +3683,7 @@ function getBatchFlowStatus(data) {
   return {
     auto_storyboard: hasStoryboardTable,
     visual_audio_assets: hasCharacterAssets,
-    fenjing_generate: hasFenjingFromChapters || hasFenjingFromDetails,
+    fenjing: hasFenjingFromChapters || hasFenjingFromDetails,
     video: hasVideos,
   };
 }
@@ -3795,11 +3722,11 @@ function updateBatchFlowButtons(data) {
 }
 
 function updateFlowProgress(status, latestJobs) {
-  const steps = ["auto_storyboard", "visual_audio_assets", "fenjing_generate", "video"];
+  const steps = ["auto_storyboard", "visual_audio_assets", "fenjing", "video"];
   const stepNames = {
     auto_storyboard: "剧本拆解",
     visual_audio_assets: "角色与素材生成",
-    fenjing_generate: "分镜图生成",
+    fenjing: "分镜图生成",
     video: "视频生成"
   };
   
@@ -5843,7 +5770,7 @@ async function submitFlow(flow) {
     ensureFlowStatusPolling();
     return;
   }
-  if (["visual_audio_assets", "fenjing_generate", "fenjing_upload", "video"].includes(flow)) {
+  if (["visual_audio_assets", "fenjing", "video"].includes(flow)) {
     const existing = state.jobs.find(j => j.type === `run_${flow}`);
     if (existing) {
       return;
@@ -5869,13 +5796,13 @@ async function clearPendingFlow(flow) {
   if (!state.selectedProject) {
     return;
   }
-  if (!["visual_audio_assets", "fenjing_generate", "fenjing_upload", "video"].includes(flow)) {
+  if (!["visual_audio_assets", "fenjing", "video"].includes(flow)) {
     return;
   }
   await apiPost(`/api/projects/${state.selectedProject}/flow/${flow}/pending/clear`);
 }
 
-async function executeFlowFull(flow) {
+async function executeFlowFull(flow, options = {}) {
   if (!state.selectedProject) {
     return;
   }
@@ -5886,22 +5813,21 @@ async function executeFlowFull(flow) {
   if (flowStatus === "completed") {
     return;
   }
-  if (flow === "fenjing_upload") {
-    const generateStatus = state.flowStatus?.flows?.fenjing_generate?.status;
-    if (!["completed", "partial_completed"].includes(generateStatus)) {
+  setFlowTouched(state.selectedProject, flow);
+  await clearPendingFlow(flow);
+  const phase = options && options.phase ? String(options.phase) : "";
+  const skipClean = flow === "fenjing" && phase === "upload_assets";
+  if (!skipClean) {
+    try {
+      await apiPost(`/api/projects/${state.selectedProject}/clean/${flow}`);
+      await refreshAssets();
+    } catch (err) {
+      window.alert("清理阶段资产失败");
       return;
     }
   }
-  setFlowTouched(state.selectedProject, flow);
-  await clearPendingFlow(flow);
-  try {
-    await apiPost(`/api/projects/${state.selectedProject}/clean/${flow}`);
-    await refreshAssets();
-  } catch (err) {
-    window.alert("清理阶段资产失败");
-    return;
-  }
-  const job = await apiPost(`/api/projects/${state.selectedProject}/run/${flow}`, {});
+  const payload = phase ? { phase } : {};
+  const job = await apiPost(`/api/projects/${state.selectedProject}/run/${flow}`, payload);
   state.jobs = state.jobs.filter(j => !j.id.startsWith(`pending_${flow}_`));
   setJobs([job, ...state.jobs]);
   renderJobs();
