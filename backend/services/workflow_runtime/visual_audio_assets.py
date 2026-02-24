@@ -4,15 +4,13 @@ import asyncio
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from . import runtime_config
 from .io_jsonl import read_jsonl, write_jsonl
 from .provider_runtime import (
     TosClientWrapper, chat, generate_tts_audios, qc_image_async, generate_and_download, generate_and_download_with_refs, run_async, emit_event,
-    get_image_concurrency,
     with_concurrency_limit,
-    with_thread_pool_limit,
     generate_image,
 )
 from .json_parse import parse_json_list as parse_json_list_shared

@@ -1,15 +1,13 @@
-import os
 import json
 import re
 import asyncio
 import time
 import urllib.parse
-from typing import List, Dict, Any, Optional, Tuple, Set
+from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import as_completed
 from .provider_runtime import (
-    download, generate_and_download, generate_and_download_with_refs, generate_image, generate_image_with_refs, qc_image_async, run_async, size_for_2k_9x16, TosClientWrapper, emit_event,
-    with_thread_pool_limit,
+    download, generate_image, generate_image_with_refs, run_async, size_for_2k_9x16, TosClientWrapper, emit_event, with_thread_pool_limit,
 )
 from .io_jsonl import write_jsonl, read_jsonl
 from .json_fields import fix_fenjing_character_fields
@@ -807,7 +805,7 @@ def generate_fenjing_images(
                     payload_preview = build_image_payload(prompt_text, refs)
                     log_debug(f"[INFO] {fenjing_label}Image payload preview - fenjing_id: {fen_id}, image: {json.dumps(payload_preview.get('image', []), ensure_ascii=False)[:200]}...")
                     log_debug(f"[INFO] {fenjing_label}Fenjing Character mapping - fenjing_id: {fen_id}, characters: {[pk + '=' + item.get(pk) for pk in char_keys]}")
-                    futures.append(pool.submit(run_async, lambda: process_single_fenjing_with_qc(idx, item, fen_id, refs, prompt_text)))
+                    futures.append(pool.submit(lambda: run_async(process_single_fenjing_with_qc(idx, item, fen_id, refs, prompt_text))))
         
         for fut in as_completed(futures):
             r = fut.result()
@@ -1623,7 +1621,7 @@ def generate_fenjing_images_local(
             prompt_text = item.get("prompt") or item.get("Prompt") or ""
             if not isinstance(prompt_text, str):
                 prompt_text = str(prompt_text) if prompt_text else ""
-            futures.append(pool.submit(run_async, lambda i=idx, it=item, f=fen_id, r=refs, p=prompt_text: process_single_fenjing_local(i, it, f, r, p)))
+            futures.append(pool.submit(lambda i=idx, it=item, f=fen_id, r=refs, p=prompt_text: run_async(process_single_fenjing_local(i, it, f, r, p))))
 
         for future in as_completed(futures):
             try:
@@ -1647,7 +1645,6 @@ def generate_fenjing_images_local(
 
 def run_fenjing_upload_workflow(project_name: Optional[str] = None) -> Dict[str, Any]:
     """上传分镜图工作流：读取本地分镜图，上传到 TOS"""
-    from .. import throttle_service
 
     project_info = f"[{project_name}] " if project_name else ""
     prefix = project_info

@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import queue
 import re
 import subprocess
 import shutil
@@ -9,13 +8,11 @@ import sys
 import threading
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from http import HTTPStatus
-from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
-from urllib.parse import parse_qs, unquote, urlparse
-from contextlib import redirect_stderr, redirect_stdout
+from urllib.parse import urlparse
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT_DIR))
@@ -28,7 +25,6 @@ sys.path.insert(0, str(MANJU_WEB_DIR))
 from backend.services.workflow_runtime.thread_safe_logging import (
     ThreadLogRedirector,
     install_thread_aware_stdout,
-    _log_manager,
 )
 
 # 安装线程感知的 stdout（只执行一次）
