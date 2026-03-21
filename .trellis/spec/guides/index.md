@@ -22,7 +22,7 @@ These guides help you **ask the right questions before coding**.
 | Guide | Purpose | When to Use |
 |-------|---------|-------------|
 | [Code Reuse Thinking Guide](./code-reuse-thinking-guide.md) | Identify patterns and reduce duplication | When you notice repeated patterns |
-| [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | Think through data flow across layers | Features spanning multiple layers |
+| [Cross-Layer Thinking Guide](./cross-layer-thinking-guide.md) | 通用跨层思维 + 项目专属模式（Job Type+Phase、状态管理、API 契约、新增 Workflow 模板、Gotchas） | 新增/修改跨层 workflow 时必读 |
 
 ---
 

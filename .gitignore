@@ -28,3 +28,4 @@ backend/config/global_auth.json
 # Misc
 frontend/.cache/
 *.bak
+.trellis/workspace/

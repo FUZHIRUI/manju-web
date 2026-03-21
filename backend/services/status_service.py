@@ -764,6 +764,8 @@ def mark_step_completed(project: str, flow: str, step: str) -> None:
         steps[step] = _STATUS_COMPLETED
         if flow == "fenjing":
             _rollup_fenjing_steps(state)
+        elif flow == "video":
+            _rollup_video_steps(state)
         new_status = _recalculate_flow_status(flow, steps)
         flows[flow]["status"] = new_status
         state["updated_at"] = time.time()

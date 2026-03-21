@@ -1,0 +1,10 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend development guide"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Video workflow follows Job Type+Phase pattern"}
+{"file": "backend/services/workflow_runtime/video.py", "reason": "Primary file: extract run_video_prepare_prompts, run_video_generate_only, run_video_upload_only, add skip_upload to process_single_video_independent"}
+{"file": "backend/services/workflow_service.py", "reason": "Add phase parameter to run_video, conditional dispatch per phase"}
+{"file": "backend/handlers/job_handler.py", "reason": "Update _resolve_flow_steps, handle_post, reset_steps for video phases"}
+{"file": "backend/services/status_service.py", "reason": "Fix missing _rollup_video_steps call in mark_step_completed"}
+{"file": "frontend/app.js", "reason": "Replace appendVideoPhaseButtons with 3-button UI"}
+{"file": ".trellis/tasks/03-21-video-phase-refactor/tasks.md", "reason": "Detailed task breakdown with line references"}
