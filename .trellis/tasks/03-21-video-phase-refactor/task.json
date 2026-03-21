@@ -1,0 +1,41 @@
+{
+  "id": "video-phase-refactor",
+  "name": "video-phase-refactor",
+  "title": "Video workflow phase refactor - 支持 phase 参数分步执行",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": "fullstack",
+  "priority": "P2",
+  "creator": "claude-agent",
+  "assignee": "claude-agent",
+  "createdAt": "2026-03-21",
+  "completedAt": null,
+  "branch": "feature/video-phase-refactor",
+  "base_branch": "feature/fenjing-job-type-unify",
+  "worktree_path": "/Users/bytedance/Desktop/常见python/trellis-worktrees/feature/video-phase-refactor",
+  "current_phase": 0,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "implement"
+    },
+    {
+      "phase": 2,
+      "action": "check"
+    },
+    {
+      "phase": 3,
+      "action": "finish"
+    },
+    {
+      "phase": 4,
+      "action": "create-pr"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "relatedFiles": [],
+  "notes": ""
+}

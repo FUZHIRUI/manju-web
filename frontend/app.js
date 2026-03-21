@@ -992,13 +992,65 @@ function appendFenjingPhaseButtons(job, container) {
 function appendVideoPhaseButtons(job, container) {
   const isPending = job && job.status === "pending";
   const disabled = job && job.status === "running";
-  
+  const flowState = state.flowStatus?.flows;
+
+  const videoFlow = flowState?.video;
+  const promptsStatus = videoFlow?.steps?.phase1_video_prompts || "waiting";
+  const generateStatus = videoFlow?.steps?.phase2_video_generation || "waiting";
+  const uploadStatus = videoFlow?.steps?.fenjing_video_upload || "waiting";
+
+  // Button 1: prepare_prompts
+  const promptsCompleted = promptsStatus === "completed" || promptsStatus === "partial_completed";
+  const promptsRunning = promptsStatus === "running";
+  const promptsDisabled = disabled || promptsRunning || promptsCompleted;
+  const promptsLabel = promptsCompleted ? "第一步：视频提示词生成 ✓" : "第一步：视频提示词生成";
+  let promptsActionLabel = "执行";
   if (isPending) {
-    appendTreeAction(container, "执行", "执行", () => executeFlowFull("video"), { disabled: false });
-    return;
+    promptsActionLabel = "执行";
+  } else if (promptsRunning) {
+    promptsActionLabel = "执行中";
+  } else if (promptsCompleted) {
+    promptsActionLabel = "已完成";
   }
-  
-  appendTreeAction(container, "执行", "执行", () => executeFlowFull("video"), { disabled });
+
+  appendTreeAction(container, promptsLabel, promptsActionLabel, () => {
+    if (promptsCompleted) return;
+    executeFlowFull("video", { phase: "prepare_prompts" });
+  }, { disabled: isPending ? false : promptsDisabled, breathing: promptsRunning });
+
+  // Button 2: generate_videos
+  const generateCompleted = generateStatus === "completed" || generateStatus === "partial_completed";
+  const generateRunning = generateStatus === "running";
+  const generateDisabled = disabled || generateRunning || generateCompleted;
+  const generateLabel = generateCompleted ? "第二步：视频生成 ✓" : "第二步：视频生成";
+  let generateActionLabel = "执行";
+  if (generateRunning) {
+    generateActionLabel = "执行中";
+  } else if (generateCompleted) {
+    generateActionLabel = "已完成";
+  }
+
+  appendTreeAction(container, generateLabel, generateActionLabel, () => {
+    if (generateCompleted) return;
+    executeFlowFull("video", { phase: "generate_videos" });
+  }, { disabled: generateDisabled, breathing: generateRunning });
+
+  // Button 3: upload_videos
+  const uploadCompleted = uploadStatus === "completed";
+  const uploadRunning = uploadStatus === "running";
+  const uploadDisabled = disabled || uploadRunning || uploadCompleted;
+  const uploadLabel = uploadCompleted ? "第三步：上传 ✓" : "第三步：上传";
+  let uploadActionLabel = "执行";
+  if (uploadRunning) {
+    uploadActionLabel = "执行中";
+  } else if (uploadCompleted) {
+    uploadActionLabel = "已完成";
+  }
+
+  appendTreeAction(container, uploadLabel, uploadActionLabel, () => {
+    if (uploadCompleted) return;
+    executeFlowFull("video", { phase: "upload_videos" });
+  }, { disabled: uploadDisabled, breathing: uploadRunning });
 }
 
 function resolveVisualAudioRetryPhase(errorEvent) {
@@ -5816,7 +5868,7 @@ async function executeFlowFull(flow, options = {}) {
   setFlowTouched(state.selectedProject, flow);
   await clearPendingFlow(flow);
   const phase = options && options.phase ? String(options.phase) : "";
-  const skipClean = flow === "fenjing" && phase === "upload_assets";
+  const skipClean = (flow === "fenjing" && phase === "upload_assets") || (flow === "video" && (phase === "upload_videos" || phase === "generate_videos"));
   if (!skipClean) {
     try {
       await apiPost(`/api/projects/${state.selectedProject}/clean/${flow}`);

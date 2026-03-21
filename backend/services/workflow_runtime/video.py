@@ -2,7 +2,7 @@ import asyncio
 import json
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 from . import runtime_config
 from .io_jsonl import read_jsonl, write_jsonl
@@ -508,7 +508,8 @@ async def process_single_video_independent(
     video_dir: Path,
     chapter_name: Optional[str] = None,
     video_filename: Optional[str] = None,
-    project_name: Optional[str] = None
+    project_name: Optional[str] = None,
+    skip_upload: bool = False,
 ) -> bool:
     """
     独立处理单个视频生成任务，包括轮询、下载、上传
@@ -920,7 +921,10 @@ async def process_single_video_independent(
                 fenjing_id=fenjing_id,
                 data={"path": str(save_path)},
             )
-            
+
+            if skip_upload:
+                return True
+
             # 使用项目特定的TOS前缀，支持多项目并行
             project_prefixes = runtime_config.get_project_prefixes(project_name) if project_name else {}
             tos_video_prefix = project_prefixes.get("TOS_VIDEO_PREFIX", "")
@@ -1628,6 +1632,453 @@ async def run_video_workflow_multi(
             step="complete",
             project=project_name,
         )
+
+async def run_video_prepare_prompts(
+    output_dir: Path,
+    qps: float = runtime_config.VIDEO_TASK_QPS,
+    tos_assets_prefix: Optional[str] = None,
+    tos_bucket: Optional[str] = None,
+    project_name: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Phase: prepare_prompts - discover chapters, download fenjing_prompts, generate video prompts.
+
+    Returns a list of chapter entry dicts (chapter_name, fenjing_prompts_path, chapter_dir, video_prompts_path).
+    """
+    if not project_name:
+        if "storyboard_assets" in output_dir.parts:
+            project_idx = output_dir.parts.index("storyboard_assets")
+            if project_idx > 0:
+                project_name = output_dir.parts[project_idx - 1]
+
+    output_dir = normalize_output_dir(output_dir, project_name)
+    storyboards_dir = output_dir / "storyboards"
+
+    scope = resolve_tos_assets_scope(tos_assets_prefix or "")
+    assets_prefix = scope["assets_prefix"] or runtime_config.TOS_ASSETS_PREFIX
+    fixed_chapter = scope["chapter_name"]
+    chapters = sorted(storyboards_dir.glob("storyboard_chapter_*.jsonl"))
+    if not chapters and tos_assets_prefix:
+        ensure_dir(storyboards_dir)
+        bucket = tos_bucket or runtime_config.TOS_BUCKET
+        if fixed_chapter:
+            chapter_jsonl_key = f"{assets_prefix.rstrip('/')}/storyboards/{fixed_chapter}.jsonl"
+            chapter_jsonl_path = storyboards_dir / f"{fixed_chapter}.jsonl"
+            if not chapter_jsonl_path.exists():
+                _video_download_file_from_tos(bucket, chapter_jsonl_key, chapter_jsonl_path)
+        else:
+            prefix = f"{assets_prefix.rstrip('/')}/storyboards/"
+            keys = list_tos_keys(bucket, prefix)
+            for key in keys:
+                name = key.split("/")[-1]
+                if not (name.startswith("storyboard_chapter_") and name.endswith(".jsonl")):
+                    continue
+                local_path = storyboards_dir / name
+                if not local_path.exists():
+                    _video_download_file_from_tos(bucket, key, local_path)
+        chapters = sorted(storyboards_dir.glob("storyboard_chapter_*.jsonl"))
+    if not chapters and tos_assets_prefix:
+        bucket = tos_bucket or runtime_config.TOS_BUCKET
+        prefix = f"{assets_prefix.rstrip('/')}/storyboards/"
+        keys = list_tos_keys(bucket, prefix)
+        chapter_names_list: List[str] = []
+        for key in keys:
+            chapter = extract_chapter_from_key(key)
+            if chapter and chapter not in chapter_names_list:
+                chapter_names_list.append(chapter)
+        if chapter_names_list:
+            chapters = [storyboards_dir / f"{name}.jsonl" for name in chapter_names_list]
+
+    emit_event(
+        "INFO",
+        "video",
+        "flow_start",
+        "video workflow start (prepare_prompts)",
+        step="start",
+        project=project_name,
+    )
+
+    if not chapters:
+        emit_event(
+            "ERROR",
+            "video",
+            "flow_error",
+            "No storyboard chapter files found",
+            step="start",
+            project=project_name,
+        )
+        return []
+
+    emit_event(
+        "INFO",
+        "video",
+        "log",
+        f"Found {len(chapters)} chapters for video prompt preparation",
+        step="general",
+        project=project_name,
+    )
+
+    bucket = tos_bucket or runtime_config.TOS_BUCKET
+    chapter_entries: List[Dict[str, Any]] = []
+    for chapter_file in chapters:
+        chapter_name = chapter_file.stem
+        chapter_dir = storyboards_dir / chapter_name
+        fenjing_prompts_path = chapter_dir / "fenjing_prompts.jsonl"
+        if not fenjing_prompts_path.exists():
+            key = f"{assets_prefix.rstrip('/')}/storyboards/{chapter_name}/fenjing_prompts.jsonl"
+            _video_download_file_from_tos(bucket, key, fenjing_prompts_path)
+        if not fenjing_prompts_path.exists():
+            prefix = f"{assets_prefix.rstrip('/')}/storyboards/{chapter_name}/"
+            keys = list_tos_keys(bucket, prefix)
+            fallback_key = None
+            for k in keys:
+                if isinstance(k, str) and k.endswith("fenjing_prompts.jsonl"):
+                    fallback_key = k
+                    break
+            if fallback_key:
+                _video_download_file_from_tos(bucket, fallback_key, fenjing_prompts_path)
+        if not fenjing_prompts_path.exists():
+            emit_event(
+                "WARN",
+                "video",
+                "log",
+                f"Fenjing prompts not found for {chapter_name}",
+                step="fenjing_prompts",
+                project=project_name,
+            )
+            continue
+        chapter_entries.append({
+            "chapter_name": chapter_name,
+            "fenjing_prompts_path": fenjing_prompts_path,
+            "chapter_dir": chapter_dir,
+        })
+
+    if not chapter_entries:
+        emit_event(
+            "ERROR",
+            "video",
+            "flow_error",
+            "No chapters with fenjing_prompts.jsonl found",
+            step="prepare",
+            project=project_name,
+        )
+        return []
+
+    emit_event(
+        "INFO",
+        "video",
+        "phase_complete",
+        "prepare completed",
+        step="prepare",
+        phase="prepare",
+        project=project_name,
+    )
+
+    # Generate video prompts for each chapter
+    interval = 1.0 / qps if qps > 0 else 0
+    loop = asyncio.get_running_loop()
+
+    async def build_video_prompts_for_chapter(ch_name: str, fp_path: Path, ch_dir: Path) -> Path:
+        video_prompts_path = ch_dir / "shipin_prompts.jsonl"
+        if video_prompts_path.exists():
+            return video_prompts_path
+        return await loop.run_in_executor(None, generate_video_prompts, fp_path, ch_dir, ch_name, project_name)
+
+    prompt_jobs: List[asyncio.Task] = []
+    for entry in chapter_entries:
+        task = asyncio.create_task(build_video_prompts_for_chapter(
+            entry["chapter_name"], entry["fenjing_prompts_path"], entry["chapter_dir"]
+        ))
+        prompt_jobs.append(task)
+        if interval > 0:
+            await asyncio.sleep(interval)
+
+    prompt_results = await asyncio.gather(*prompt_jobs, return_exceptions=True)
+    for entry, result in zip(chapter_entries, prompt_results):
+        if isinstance(result, Exception):
+            emit_event(
+                "ERROR",
+                "video",
+                "log",
+                f"[{entry['chapter_name']}] Video prompt generation failed: {result}",
+                step="general",
+                project=project_name,
+            )
+        else:
+            entry["video_prompts_path"] = result
+
+    emit_event(
+        "INFO",
+        "video",
+        "phase_complete",
+        "phase1_video_prompts completed",
+        step="phase1_video_prompts",
+        phase="phase1_video_prompts",
+        project=project_name,
+    )
+
+    return chapter_entries
+
+
+async def run_video_generate_only(
+    output_dir: Path,
+    project_name: Optional[str] = None,
+) -> Tuple[int, int]:
+    """Phase: generate_videos - scan for existing shipin_prompts.jsonl, generate videos, download to local (skip TOS upload).
+
+    Returns (success_count, error_count).
+    """
+    if not project_name:
+        if "storyboard_assets" in output_dir.parts:
+            project_idx = output_dir.parts.index("storyboard_assets")
+            if project_idx > 0:
+                project_name = output_dir.parts[project_idx - 1]
+
+    output_dir = normalize_output_dir(output_dir, project_name)
+    storyboards_dir = output_dir / "storyboards"
+
+    emit_event(
+        "INFO",
+        "video",
+        "flow_start",
+        "video workflow start (generate_videos)",
+        step="start",
+        project=project_name,
+    )
+
+    # Discover chapters that already have shipin_prompts.jsonl
+    chapter_dirs = sorted(storyboards_dir.glob("storyboard_chapter_*"))
+    chapter_entries: List[Dict[str, Any]] = []
+    for ch_dir in chapter_dirs:
+        if not ch_dir.is_dir():
+            continue
+        shipin_path = ch_dir / "shipin_prompts.jsonl"
+        fenjing_path = ch_dir / "fenjing_prompts.jsonl"
+        if not shipin_path.exists():
+            continue
+        chapter_entries.append({
+            "chapter_name": ch_dir.name,
+            "chapter_dir": ch_dir,
+            "shipin_prompts_path": shipin_path,
+            "fenjing_prompts_path": fenjing_path,
+        })
+
+    if not chapter_entries:
+        emit_event(
+            "ERROR",
+            "video",
+            "flow_error",
+            "No chapters with shipin_prompts.jsonl found for generate_videos",
+            step="phase2_video_generation",
+            project=project_name,
+        )
+        return (0, 0)
+
+    emit_event(
+        "INFO",
+        "video",
+        "log",
+        f"Found {len(chapter_entries)} chapters for video generation",
+        step="general",
+        project=project_name,
+    )
+
+    tos_client = TosClientWrapper()
+    all_tasks: List[asyncio.Task] = []
+
+    for entry in chapter_entries:
+        chapter_name = entry["chapter_name"]
+        shipin_path = entry["shipin_prompts_path"]
+        fenjing_path = entry["fenjing_prompts_path"]
+        video_dir = output_dir / "video" / chapter_name
+        ensure_dir(video_dir)
+
+        prompts = read_jsonl(str(shipin_path))
+        # Build duration map from fenjing_prompts.jsonl
+        fenjing_duration_map: Dict[str, float] = {}
+        if fenjing_path.exists():
+            fenjing_items = read_jsonl(str(fenjing_path))
+            fenjing_duration_map = {str(item.get("fenjing_id", "")): item.get("duration", 5.0) for item in fenjing_items}
+
+        interval = 1.0 / runtime_config.VIDEO_TASK_QPS if runtime_config.VIDEO_TASK_QPS > 0 else 0
+
+        for item in prompts:
+            fenjing_id = str(item.get("fenjing_id", ""))
+            model_version = str(item.get("model", "1.5"))
+            prompt = item.get("prompt", "")
+            if not fenjing_id or not prompt:
+                continue
+
+            if "1.0" in model_version:
+                model_ep = runtime_config.VIDEO_MODEL_1_0_EP
+                min_duration = runtime_config.VIDEO_MIN_DURATION_1_0
+            else:
+                model_ep = runtime_config.VIDEO_MODEL_1_5_EP
+                min_duration = runtime_config.VIDEO_MIN_DURATION_1_5
+
+            project_prefixes = runtime_config.get_project_prefixes(project_name) if project_name else {}
+            tos_fenjing_prefix = project_prefixes.get("TOS_FENJING_PREFIX", "")
+            image_key = f"{tos_fenjing_prefix}/{chapter_name}/fenjing{fenjing_id}.png" if chapter_name else f"{tos_fenjing_prefix}/fenjing{fenjing_id}.png"
+            image_url = tos_client.presign_get(runtime_config.TOS_BUCKET, image_key)
+            if not image_url:
+                continue
+
+            audio_duration = fenjing_duration_map.get(fenjing_id, 5.0)
+
+            task = asyncio.create_task(process_single_video_independent(
+                fenjing_id=fenjing_id,
+                model_ep=model_ep,
+                prompt=prompt,
+                image_url=image_url,
+                audio_duration=audio_duration,
+                min_duration=min_duration,
+                video_dir=video_dir,
+                chapter_name=chapter_name,
+                project_name=project_name,
+                skip_upload=True,
+            ))
+            all_tasks.append(task)
+            if interval > 0:
+                await asyncio.sleep(interval)
+
+    if not all_tasks:
+        emit_event(
+            "WARN",
+            "video",
+            "log",
+            "No video tasks created for generate_videos phase",
+            step="phase2_video_generation",
+            project=project_name,
+        )
+        return (0, 0)
+
+    results = await asyncio.gather(*all_tasks, return_exceptions=True)
+    success_count = sum(1 for r in results if r is True)
+    error_count = sum(1 for r in results if isinstance(r, Exception) or r is False)
+
+    emit_event(
+        "INFO",
+        "video",
+        "phase_complete",
+        "phase2_video_generation completed",
+        step="phase2_video_generation",
+        phase="phase2_video_generation",
+        project=project_name,
+        data={"success": success_count, "error": error_count, "total": len(results)},
+    )
+
+    return (success_count, error_count)
+
+
+async def run_video_upload_only(
+    output_dir: Path,
+    project_name: Optional[str] = None,
+) -> Tuple[int, int]:
+    """Phase: upload_videos - scan local MP4 files and upload to TOS.
+
+    Returns (success_count, error_count).
+    """
+    if not project_name:
+        if "storyboard_assets" in output_dir.parts:
+            project_idx = output_dir.parts.index("storyboard_assets")
+            if project_idx > 0:
+                project_name = output_dir.parts[project_idx - 1]
+
+    output_dir = normalize_output_dir(output_dir, project_name)
+
+    emit_event(
+        "INFO",
+        "video",
+        "flow_start",
+        "video workflow start (upload_videos)",
+        step="start",
+        project=project_name,
+    )
+
+    tos = TosClientWrapper()
+    if not tos.available():
+        emit_event(
+            "ERROR",
+            "video",
+            "flow_error",
+            "TOS client not available for upload",
+            step="fenjing_video_upload",
+            project=project_name,
+        )
+        return (0, 0)
+
+    project_prefixes = runtime_config.get_project_prefixes(project_name) if project_name else {}
+    tos_video_prefix = project_prefixes.get("TOS_VIDEO_PREFIX", "")
+
+    video_base = output_dir / "video"
+    if not video_base.exists():
+        emit_event(
+            "WARN",
+            "video",
+            "log",
+            "No video directory found for upload",
+            step="fenjing_video_upload",
+            project=project_name,
+        )
+        return (0, 0)
+
+    success_count = 0
+    error_count = 0
+
+    for chapter_dir in sorted(video_base.iterdir()):
+        if not chapter_dir.is_dir():
+            continue
+        chapter_name = chapter_dir.name
+        for mp4_file in sorted(chapter_dir.glob("fenjing_*_video.mp4")):
+            tos_key = f"{tos_video_prefix}/{chapter_name}/{mp4_file.name}"
+            emit_event(
+                "INFO",
+                "video",
+                "fenjing_video_upload_start",
+                f"Uploading {mp4_file.name} to TOS",
+                step="fenjing_video_upload",
+                project=project_name,
+                chapter=chapter_name,
+                data={"key": tos_key, "path": str(mp4_file)},
+            )
+            uploaded_url = tos.upload_file(runtime_config.TOS_BUCKET, tos_key, mp4_file)
+            if uploaded_url:
+                emit_event(
+                    "INFO",
+                    "video",
+                    "fenjing_video_uploaded",
+                    f"Uploaded {mp4_file.name} to TOS",
+                    step="fenjing_video_upload",
+                    project=project_name,
+                    chapter=chapter_name,
+                    data={"key": tos_key, "url": uploaded_url},
+                )
+                success_count += 1
+            else:
+                emit_event(
+                    "ERROR",
+                    "video",
+                    "fenjing_video_upload_error",
+                    f"Failed to upload {mp4_file.name} to TOS",
+                    step="fenjing_video_upload",
+                    project=project_name,
+                    chapter=chapter_name,
+                    data={"key": tos_key},
+                )
+                error_count += 1
+
+    emit_event(
+        "INFO",
+        "video",
+        "phase_complete",
+        "fenjing_video_upload completed",
+        step="fenjing_video_upload",
+        phase="fenjing_video_upload",
+        project=project_name,
+        data={"success": success_count, "error": error_count},
+    )
+
+    return (success_count, error_count)
+
 
 if __name__ == "__main__":
     import sys

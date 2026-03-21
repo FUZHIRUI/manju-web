@@ -425,52 +425,135 @@ def run_fenjing_upload(job_id: str, project: str) -> None:
     run_fenjing(job_id, project, phase="upload_assets")
 
 
-def run_video(job_id: str, project: str) -> None:
+def run_video(job_id: str, project: str, phase: str = "all") -> None:
+    """
+    Unified video workflow execution function.
+
+    Args:
+        job_id: Job ID
+        project: Project name
+        phase: Execution phase - "prepare_prompts", "generate_videos", "upload_videos", or "all"
+    """
     job = job_repo.get_job(job_id)
     if not job:
         return
     log_path = job_repo.resolve_log_path(str(job["log_path"]))
-    job_repo.log_event("INFO", "run_video_start", trace_id=job["trace_id"], job_id=job_id, project=project)
+    job_repo.log_event("INFO", "run_video_start", trace_id=job["trace_id"], job_id=job_id, project=project, phase=phase)
     stage_limiter = throttle_service.acquire_stage_limit("video")
     try:
         with ThreadLogRedirector(log_path):
             try:
                 load_manju_context(project)
                 local_out = project_repo.storyboard_assets_dir(project)
-                asyncio.run(call_with_project(video.run_video_workflow_multi, local_out, project_name=project))
-                try:
-                    results = asset_repo.build_video_asset_results(job_id, project)
-                    asset_repo.append_asset_results(project, results)
-                    summary = asset_repo.aggregate_partial_failures(results)
-                    job_repo.update_job(
-                        job_id,
-                        status="success",
-                        partial_failed=summary.get("partial_failed", False),
-                        partial_failed_count=summary.get("partial_failed_count", 0),
-                        partial_failed_types=summary.get("partial_failed_types", []),
+
+                if phase == "all":
+                    # Original behavior: run full workflow
+                    asyncio.run(call_with_project(video.run_video_workflow_multi, local_out, project_name=project))
+                    try:
+                        results = asset_repo.build_video_asset_results(job_id, project)
+                        asset_repo.append_asset_results(project, results)
+                        summary = asset_repo.aggregate_partial_failures(results)
+                        job_repo.update_job(
+                            job_id,
+                            status="success",
+                            partial_failed=summary.get("partial_failed", False),
+                            partial_failed_count=summary.get("partial_failed_count", 0),
+                            partial_failed_types=summary.get("partial_failed_types", []),
+                        )
+                        if summary.get("partial_failed"):
+                            status_service.update_step_partial(project, "video", "phase2_video_generation")
+                            status_service.mark_flow_partial(project, "video")
+                        else:
+                            status_service.mark_flow_completed(project, "video")
+                    except Exception as exc:
+                        job_repo.update_job(job_id, status="error", error=str(exc))
+                        status_service.mark_flow_error(project, "video", ["phase2_video_generation"])
+                        job_repo.log_event(
+                            "ERROR",
+                            "asset_results_build_error",
+                            trace_id=job["trace_id"],
+                            job_id=job_id,
+                            project=project,
+                            flow="video",
+                            error=str(exc),
+                        )
+                    job_repo.log_event("INFO", "run_video_success", trace_id=job["trace_id"], job_id=job_id)
+                    return
+
+                elif phase == "prepare_prompts":
+                    asyncio.run(call_with_project(video.run_video_prepare_prompts, local_out, project_name=project))
+                    status_service.mark_step_completed(project, "video", "prepare")
+                    status_service.mark_step_completed(project, "video", "phase1_video_prompts")
+                    job_repo.update_job(job_id, status="success")
+                    job_repo.log_event("INFO", "run_video_success", trace_id=job["trace_id"], job_id=job_id, phase=phase)
+                    return
+
+                elif phase == "generate_videos":
+                    success_count, error_count = asyncio.run(
+                        call_with_project(video.run_video_generate_only, local_out, project_name=project)
                     )
-                    if summary.get("partial_failed"):
-                        status_service.update_step_partial(project, "video", "phase2_video_generation")
-                        status_service.mark_flow_partial(project, "video")
+                    try:
+                        results = asset_repo.build_video_asset_results(job_id, project)
+                        asset_repo.append_asset_results(project, results)
+                        summary = asset_repo.aggregate_partial_failures(results)
+                        if summary.get("partial_failed"):
+                            status_service.update_step_partial(project, "video", "phase2_video_generation")
+                            status_service.mark_flow_partial(project, "video")
+                            job_repo.update_job(
+                                job_id,
+                                status="success",
+                                partial_failed=True,
+                                partial_failed_count=summary.get("partial_failed_count", 0),
+                                partial_failed_types=summary.get("partial_failed_types", []),
+                            )
+                        else:
+                            status_service.mark_step_completed(project, "video", "phase2_video_generation")
+                            job_repo.update_job(job_id, status="success")
+                    except Exception:
+                        # Fallback: if asset results build fails, still mark based on counts
+                        if error_count > 0 and success_count == 0:
+                            status_service.mark_flow_error(project, "video", ["phase2_video_generation"])
+                            job_repo.update_job(job_id, status="error", error="all_videos_failed")
+                        elif error_count > 0:
+                            status_service.update_step_partial(project, "video", "phase2_video_generation")
+                            status_service.mark_flow_partial(project, "video")
+                            job_repo.update_job(job_id, status="success", partial_failed=True, partial_failed_count=error_count)
+                        else:
+                            status_service.mark_step_completed(project, "video", "phase2_video_generation")
+                            job_repo.update_job(job_id, status="success")
+                    job_repo.log_event("INFO", "run_video_success", trace_id=job["trace_id"], job_id=job_id, phase=phase)
+                    return
+
+                elif phase == "upload_videos":
+                    success_count, error_count = asyncio.run(
+                        call_with_project(video.run_video_upload_only, local_out, project_name=project)
+                    )
+                    if error_count > 0 and success_count == 0:
+                        status_service.mark_flow_error(project, "video", ["fenjing_video_upload"])
+                        job_repo.update_job(job_id, status="error", error="all_uploads_failed")
                     else:
-                        status_service.mark_flow_completed(project, "video")
-                except Exception as exc:
-                    job_repo.update_job(job_id, status="error", error=str(exc))
-                    status_service.mark_flow_error(project, "video", ["phase2_video_generation"])
-                    job_repo.log_event(
-                        "ERROR",
-                        "asset_results_build_error",
-                        trace_id=job["trace_id"],
-                        job_id=job_id,
-                        project=project,
-                        flow="video",
-                        error=str(exc),
-                    )
-                job_repo.log_event("INFO", "run_video_success", trace_id=job["trace_id"], job_id=job_id)
-                return
+                        status_service.mark_step_completed(project, "video", "fenjing_video_upload")
+                        job_repo.update_job(job_id, status="success")
+                    job_repo.log_event("INFO", "run_video_success", trace_id=job["trace_id"], job_id=job_id, phase=phase)
+                    return
+
             except Exception as exc:
+                import traceback as _tb
+                error_msg = f"{str(exc)}\n{_tb.format_exc()}"
+                try:
+                    sys.__stderr__.write(f"=== VIDEO ERROR ===\n{error_msg}\n=====================\n")
+                    sys.__stderr__.flush()
+                except Exception:
+                    pass
                 job_repo.update_job(job_id, status="error", error=str(exc))
-                status_service.mark_flow_error(project, "video", ["phase2_video_generation"])
+                if phase == "prepare_prompts":
+                    status_service.mark_flow_error(project, "video", ["prepare", "phase1_video_prompts"])
+                elif phase == "generate_videos":
+                    status_service.mark_flow_error(project, "video", ["phase2_video_generation"])
+                elif phase == "upload_videos":
+                    status_service.mark_flow_error(project, "video", ["fenjing_video_upload"])
+                else:
+                    status_service.mark_flow_error(project, "video", ["phase2_video_generation"])
                 job_repo.log_event("ERROR", "run_video_error", trace_id=job["trace_id"], job_id=job_id, error=str(exc))
     finally:
         if stage_limiter:
