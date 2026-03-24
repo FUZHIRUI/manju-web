@@ -658,11 +658,33 @@ def clear_pending_state(project: str, flow: str) -> None:
 def update_step_partial(project: str, flow: str, step: str) -> None:
     if flow not in _PARTIAL_STEPS or step not in _PARTIAL_STEPS.get(flow, []):
         return
-    state = get_flow_state(project)
-    steps = state.get("flows", {}).get(flow, {}).get("steps", {})
-    if step in steps:
-        steps[step] = _STATUS_PARTIAL_RETURNED
-        _set_flow_status(state, flow, _STATUS_PARTIAL_RETURNED)
+    with _get_project_lock(project):
+        state = get_flow_state(project)
+        steps = state.get("flows", {}).get(flow, {}).get("steps", {})
+        if step in steps:
+            steps[step] = _STATUS_PARTIAL_RETURNED
+            _set_flow_status(state, flow, _STATUS_PARTIAL_RETURNED)
+            state["updated_at"] = time.time()
+            status_repo.write_flow_state(project, state)
+
+
+def mark_step_completed(project: str, flow: str, step: str) -> None:
+    """标记特定步骤完成，并重新计算flow状态（不改变其他步骤状态）"""
+    with _get_project_lock(project):
+        state = get_flow_state(project)
+        flows = state.get("flows")
+        if not isinstance(flows, dict) or flow not in flows:
+            return
+        steps = flows[flow].get("steps")
+        if not isinstance(steps, dict) or step not in steps:
+            return
+        steps[step] = _STATUS_COMPLETED
+        if flow == "fenjing":
+            _rollup_fenjing_steps(state)
+        elif flow == "video":
+            _rollup_video_steps(state)
+        new_status = _recalculate_flow_status(flow, steps)
+        flows[flow]["status"] = new_status
         state["updated_at"] = time.time()
         status_repo.write_flow_state(project, state)
 

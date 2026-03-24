@@ -33,11 +33,9 @@ Phase 2: 基于Phase 1产出生成分镜剧本
 - json_parse/json_fields: JSON处理
 """
 
-import os
 import json
 import time
 import requests
-import re
 import asyncio
 import httpx
 import uuid
@@ -59,7 +57,6 @@ PROMPT_DIR = Path(__file__).resolve().parent / "prompt"
 
 class ContentFilterError(Exception):
     """当API返回content_filter finish_reason时抛出此异常"""
-    pass
 
 def read_text(path: str) -> str:
     """读取文本文件内容"""
@@ -1441,7 +1438,6 @@ def run_workflow(
         )
     
     import asyncio
-    import httpx
     STORYBOARD_BATCH_SIZE = runtime_config.STORYBOARD_BATCH_SIZE
     STORYBOARD_THINKING = runtime_config.STORYBOARD_THINKING
     STORYBOARD_REASONING_EFFORT = runtime_config.STORYBOARD_REASONING_EFFORT

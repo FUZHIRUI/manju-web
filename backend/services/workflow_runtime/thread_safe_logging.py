@@ -117,7 +117,6 @@ class ThreadAwareStdout:
     
     def flush(self) -> None:
         """刷新缓冲区"""
-        pass
     
     def isatty(self) -> bool:
         """是否为终端"""

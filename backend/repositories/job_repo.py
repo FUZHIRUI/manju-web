@@ -39,8 +39,8 @@ def _build_usage_event(job: Dict[str, Any], status: str, created_at: float) -> O
     mapping = {
         "run_visual_audio_assets": ("image", "visual_audio_assets"),
         "run_fenjing": ("image", "fenjing_batch"),
-        "run_fenjing_generate": ("image", "fenjing_generate"),
-        "run_fenjing_upload": ("image", "fenjing_upload"),
+        "run_fenjing_generate": ("image", "fenjing"),  # 统一映射到 fenjing
+        "run_fenjing_upload": ("image", "fenjing"),    # 统一映射到 fenjing
         "run_video": ("video", "video_batch"),
         "regenerate_character": ("image", "character"),
         "regenerate_location_image": ("image", "location"),

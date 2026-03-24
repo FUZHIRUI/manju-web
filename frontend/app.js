@@ -995,13 +995,34 @@ function appendFenjingPhaseButtons(job, container) {
 function appendVideoPhaseButtons(job, container) {
   const isPending = job && job.status === "pending";
   const disabled = job && job.status === "running";
-  
-  if (isPending) {
-    appendTreeAction(container, "执行", "执行", () => executeFlowFull("video"), { disabled: false });
-    return;
+  const flowState = state.flowStatus?.flows;
+  const videoFlow = flowState?.video;
+
+  const phases = [
+    { label: "第一步：视频提示词生成", phase: "prepare_prompts", stepKey: "phase1_video_prompts" },
+    { label: "第二步：视频生成", phase: "generate_videos", stepKey: "phase2_video_generation" },
+    { label: "第三步：上传", phase: "upload_videos", stepKey: "fenjing_video_upload" },
+  ];
+
+  for (const p of phases) {
+    const stepStatus = videoFlow?.steps?.[p.stepKey] || "waiting";
+    const completed = stepStatus === "completed" || stepStatus === "partial_completed";
+    const running = stepStatus === "running";
+    const btnDisabled = disabled || running || completed;
+    const btnLabel = completed ? `${p.label} ✓` : p.label;
+    let actionLabel = "执行";
+    if (isPending) {
+      actionLabel = "执行";
+    } else if (running) {
+      actionLabel = "执行中";
+    } else if (completed) {
+      actionLabel = "已完成";
+    }
+    appendTreeAction(container, btnLabel, actionLabel, () => {
+      if (completed) return;
+      executeFlowFull("video", { phase: p.phase });
+    }, { disabled: isPending ? false : btnDisabled, breathing: running });
   }
-  
-  appendTreeAction(container, "执行", "执行", () => executeFlowFull("video"), { disabled });
 }
 
 function resolveVisualAudioRetryPhase(errorEvent) {
@@ -5886,9 +5907,17 @@ async function executeFlowFull(flow) {
   if (flowStatus === "completed") {
     return;
   }
-  if (flow === "fenjing_upload") {
-    const generateStatus = state.flowStatus?.flows?.fenjing_generate?.status;
-    if (!["completed", "partial_completed"].includes(generateStatus)) {
+  setFlowTouched(state.selectedProject, flow);
+  await clearPendingFlow(flow);
+  const phase = options && options.phase ? String(options.phase) : "";
+  const skipClean = (flow === "fenjing" && phase === "upload_assets")
+    || (flow === "video" && !!phase && phase !== "all");
+  if (!skipClean) {
+    try {
+      await apiPost(`/api/projects/${state.selectedProject}/clean/${flow}`);
+      await refreshAssets();
+    } catch (err) {
+      window.alert("清理阶段资产失败");
       return;
     }
   }

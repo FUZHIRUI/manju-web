@@ -126,7 +126,15 @@ def _resolve_flow_steps(workflow: str, phase: Optional[str]) -> list:
     if workflow == "fenjing_upload":
         return ["upload_fenjing_images"]
     if workflow == "video":
-        return ["prepare"]
+        token = str(phase or "").strip().lower()
+        if token == "prepare_prompts":
+            return ["prepare", "phase1_video_prompts"]
+        elif token == "generate_videos":
+            return ["phase2_video_generation"]
+        elif token == "upload_videos":
+            return ["fenjing_video_upload"]
+        else:
+            return ["prepare", "phase1_video_prompts", "phase2_video_generation", "fenjing_video_upload"]
     return []
 
 
@@ -258,11 +266,12 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
             )
         else:
             # 启动视频生成阶段
+            phase = str(body.get("phase", "all")).strip().lower()
             job = job_service.start_job(
                 "run_video",
                 project,
-                lambda job_id: workflow_service.run_video(job_id, project),
-                {},
+                lambda job_id, p=phase: workflow_service.run_video(job_id, project, phase=p),
+                {"phase": phase},
             )
         phase_value = body.get("phase") if isinstance(body, dict) else None
         steps = _resolve_flow_steps(workflow, phase_value)
@@ -279,8 +288,19 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
             if token in {"phase1", "phase2", "step1", "step2", "step3_upload"}:
                 reset_steps = False
                 status_service.reset_flow_steps(project, workflow, steps)
-        status_service.mark_flow_running(project, workflow, steps, reset_steps=reset_steps)
-        _schedule_job_timeout(job.get("id", ""), project, workflow, steps)
+        elif workflow == "fenjing":
+            token = str(phase_value or "").strip().lower()
+            if token in {"generate_images", "upload_assets"}:
+                reset_steps = False
+        elif workflow in {"fenjing_generate", "fenjing_upload"}:
+            reset_steps = False
+        elif workflow == "video":
+            token = str(phase_value or "").strip().lower()
+            if token in {"prepare_prompts", "generate_videos", "upload_videos"}:
+                reset_steps = False
+        actual_flow = status_service.WORKFLOW_TO_FLOW_MAP.get(workflow, workflow)
+        status_service.mark_flow_running(project, actual_flow, steps, reset_steps=reset_steps)
+        _schedule_job_timeout(job.get("id", ""), project, actual_flow, steps)
         send_json(handler, HTTPStatus.OK, job)
         return True
     if path.startswith("/api/projects/") and path.endswith("/regenerate/character"):

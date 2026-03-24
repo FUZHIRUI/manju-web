@@ -20,7 +20,6 @@ from .. import throttle_service
 
 class WorkflowRuntimeError(Exception):
     """工作流运行时错误基类。"""
-    pass
 
 
 class ImageGenerationError(WorkflowRuntimeError):

@@ -1,0 +1,10 @@
+{"file": ".claude/commands/trellis/finish-work.md", "reason": "Finish work checklist"}
+{"file": ".claude/commands/trellis/check-backend.md", "reason": "Backend check spec"}
+{"file": ".claude/commands/trellis/check-frontend.md", "reason": "Frontend check spec"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify against cross-layer patterns"}
+{"file": "backend/services/workflow_runtime/video.py", "reason": "Verify new functions extracted correctly"}
+{"file": "backend/services/workflow_service.py", "reason": "Verify phase dispatch follows fenjing pattern"}
+{"file": "backend/handlers/job_handler.py", "reason": "Verify _resolve_flow_steps, handle_post, reset_steps"}
+{"file": "backend/services/status_service.py", "reason": "Verify _rollup_video_steps call added"}
+{"file": "frontend/app.js", "reason": "Verify 3-button UI matches fenjing pattern"}
+{"file": ".trellis/tasks/03-21-video-phase-refactor/prd.md", "reason": "Acceptance criteria to verify against"}
