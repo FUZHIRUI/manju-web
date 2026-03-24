@@ -1,15 +1,10 @@
 """Prompt building utilities for visual audio assets module."""
 
-import json
-import re
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
-from .utils import read_text
+from typing import Any, Dict, List, Optional
 
 
 def build_character_prompt(
-    character_name: str,
+    _character_name: str,
     base_prompt: str,
     attribute: Optional[str] = None,
     outfit_desc: Optional[str] = None,
@@ -43,7 +38,7 @@ def build_character_prompt(
 
 
 def build_location_prompt(
-    location_name: str,
+    _location_name: str,
     location_desc: str,
     scene_type: Optional[str] = None,
     time_of_day: Optional[str] = None,
@@ -123,93 +118,3 @@ def build_fenjing_prompt(
         prompt_parts.append("电影级画面，高质量，精致细节")
 
     return "; ".join(prompt_parts)
-
-
-def load_prompt_template(template_path: Path) -> str:
-    """
-    Load a prompt template from file.
-
-    Args:
-        template_path: Path to template file
-
-    Returns:
-        Template string
-    """
-    return read_text(template_path)
-
-
-def format_prompt(template: str, variables: Dict[str, Any]) -> str:
-    """
-    Format a prompt template with variables.
-
-    Args:
-        template: Template string with {variable} placeholders
-        variables: Dictionary of variables to substitute
-
-    Returns:
-        Formatted prompt string
-    """
-    try:
-        return template.format(**variables)
-    except KeyError as e:
-        # Log missing variable and return template with available substitutions
-        return template.format(**{k: v for k, v in variables.items() if f"{{{k}}}" in template})
-
-
-def build_tts_prompt(
-    text: str,
-    character_name: Optional[str] = None,
-    emotion: Optional[str] = None,
-    speed: float = 1.0,
-) -> Dict[str, Any]:
-    """
-    Build TTS (text-to-speech) configuration.
-
-    Args:
-        text: Text to speak
-        character_name: Character name (for voice selection)
-        emotion: Emotion hint
-        speed: Speech speed multiplier
-
-    Returns:
-        TTS configuration dict
-    """
-    config: Dict[str, Any] = {
-        "text": text,
-        "speed": speed,
-    }
-
-    if character_name:
-        config["voice_character"] = character_name
-
-    if emotion:
-        config["emotion"] = emotion
-
-    return config
-
-
-def merge_prompt_parts(base_parts: List[str], override_parts: Optional[List[str]] = None) -> str:
-    """
-    Merge multiple prompt parts into a single prompt.
-
-    Args:
-        base_parts: Base prompt parts
-        override_parts: Additional parts to append
-
-    Returns:
-        Merged prompt string
-    """
-    all_parts = list(base_parts)
-    if override_parts:
-        all_parts.extend(override_parts)
-
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_parts = []
-    for part in all_parts:
-        part_clean = part.strip()
-        if part_clean and part_clean not in seen:
-            seen.add(part_clean)
-            unique_parts.append(part_clean)
-
-    return "; ".join(unique_parts)

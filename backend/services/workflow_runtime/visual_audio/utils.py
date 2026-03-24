@@ -1,6 +1,5 @@
 """Utility functions for visual audio assets module."""
 
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -16,13 +15,6 @@ def read_text(path: Union[str, Path]) -> str:
     """Read text file contents."""
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
-
-
-def read_json(path: Union[str, Path]) -> Any:
-    """Read and parse JSON file."""
-    import json
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 
 def safe_get(
@@ -71,41 +63,6 @@ def resolve_character_size_by_attribute(attribute: Optional[str]) -> Optional[st
         if attr == "兽类":
             return runtime_config.CHARACTER_BEAST_IMAGE_SIZE
     return None
-
-
-def slugify(text: str, max_length: int = 50) -> str:
-    """
-    Convert text to URL-friendly slug.
-
-    Args:
-        text: Input text
-        max_length: Maximum length of output
-
-    Returns:
-        Slugified string
-    """
-    # Convert to lowercase and replace spaces/special chars with underscore
-    slug = re.sub(r'[^\w\s-]', '', text.lower())
-    slug = re.sub(r'[-\s]+', '_', slug)
-    # Trim to max length
-    return slug[:max_length].strip('_')
-
-
-def format_duration(seconds: float) -> str:
-    """Format duration in seconds to human readable string."""
-    if seconds < 60:
-        return f"{seconds:.1f}s"
-    elif seconds < 3600:
-        minutes = seconds / 60
-        return f"{minutes:.1f}m"
-    else:
-        hours = seconds / 3600
-        return f"{hours:.1f}h"
-
-
-def chunk_list(lst: List[Any], chunk_size: int) -> List[List[Any]]:
-    """Split list into chunks of specified size."""
-    return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
 
 def merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
