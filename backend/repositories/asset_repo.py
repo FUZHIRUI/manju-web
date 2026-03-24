@@ -324,24 +324,20 @@ def build_cloth_changed_prompt(outfit_desc: Any) -> str:
     return base
 
 
-def build_cloth_changed_details(project: str, assets: Path, visual_assets: Optional[Path] = None) -> List[Dict[str, Any]]:
+def build_cloth_changed_details(project: str, assets: Path) -> List[Dict[str, Any]]:
     chars_path = assets / "characters.jsonl"
     rows: List[Dict[str, Any]] = []
     candidate_map: Dict[str, List[str]] = {}
-    # 从两个目录查找候选图片
-    candidate_dirs = [assets / "cloth_changed_candidates"]
-    if visual_assets:
-        candidate_dirs.append(visual_assets / "cloth_changed_candidates")
-    for candidate_dir in candidate_dirs:
-        if candidate_dir.exists():
-            for p in sorted(candidate_dir.iterdir()):
-                if not p.is_file():
-                    continue
-                if p.suffix.lower() not in (".png", ".jpg", ".jpeg"):
-                    continue
-                match = re.match(r"(.+)_\d+$", p.stem)
-                key = match.group(1) if match else p.stem
-                candidate_map.setdefault(key, []).append(to_project_relative(project, p))
+    candidate_dir = assets / "cloth_changed_candidates"
+    if candidate_dir.exists():
+        for p in sorted(candidate_dir.iterdir()):
+            if not p.is_file():
+                continue
+            if p.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+                continue
+            match = re.match(r"(.+)_\d+$", p.stem)
+            key = match.group(1) if match else p.stem
+            candidate_map.setdefault(key, []).append(to_project_relative(project, p))
     seen: Set[str] = set()
     for item in safe_read_jsonl(chars_path):
         if not isinstance(item, dict):
@@ -364,12 +360,7 @@ def build_cloth_changed_details(project: str, assets: Path, visual_assets: Optio
                 continue
             seen.add(key)
             prompt_text = ch.get("st_prompt") or ch.get("prompt") or build_cloth_changed_prompt(ch.get("Outfit_Description"))
-            # 优先从 visual_assets 查找图片
-            image_path = None
-            if visual_assets:
-                image_path = visual_assets / "cloth_changed_images" / f"{key}.png"
-            if not image_path or not image_path.exists():
-                image_path = assets / "cloth_changed_images" / f"{key}.png"
+            image_path = assets / "cloth_changed_images" / f"{key}.png"
             rows.append(
                 {
                     "cloth_changed_id": key,
@@ -568,11 +559,7 @@ def list_project_assets(project: str) -> Dict[str, Any]:
     elif assets.exists():
         data["character_details"] = build_character_details(project, assets)
     
-    # 优先从visual_assets构建cloth_changed_details
-    if visual_assets.exists():
-        data["cloth_changed_details"] = build_cloth_changed_details(project, visual_assets, visual_assets)
-    else:
-        data["cloth_changed_details"] = build_cloth_changed_details(project, assets)
+    data["cloth_changed_details"] = build_cloth_changed_details(project, assets)
     
     # 从两个目录合并查找场景图片
     location_images_from_visual = list_files(visual_assets / "location_images", (".png", ".jpg", ".jpeg")) if visual_assets.exists() else []
@@ -593,31 +580,14 @@ def list_project_assets(project: str) -> Dict[str, Any]:
     elif assets.exists():
         data["expected_locations"] = build_expected_locations(project, assets)
     
-    # 从两个目录合并查找服装图片（优先使用visual_audio_assets中的）
-    cloth_images_from_visual = list_files(visual_assets / "cloth_images", (".png", ".jpg", ".jpeg")) if visual_assets.exists() else []
-    cloth_images_from_storyboard = list_files(assets / "cloth_images", (".png", ".jpg", ".jpeg")) if assets.exists() else []
-    all_cloth_images = cloth_images_from_visual + cloth_images_from_storyboard
-    seen_cloth = set()
-    unique_cloth_images = []
-    for p in all_cloth_images:
-        stem = Path(p).stem
-        if stem not in seen_cloth:
-            seen_cloth.add(stem)
-            unique_cloth_images.append(p)
-    data["cloth"] = [to_project_relative(project, Path(p)) for p in unique_cloth_images]
-    
-    # 从两个目录合并查找换装图片（优先使用visual_audio_assets中的）
-    cloth_changed_from_visual = list_files(visual_assets / "cloth_changed_images", (".png", ".jpg", ".jpeg")) if visual_assets.exists() else []
-    cloth_changed_from_storyboard = list_files(assets / "cloth_changed_images", (".png", ".jpg", ".jpeg")) if assets.exists() else []
-    all_cloth_changed = cloth_changed_from_visual + cloth_changed_from_storyboard
-    seen_changed = set()
-    unique_cloth_changed = []
-    for p in all_cloth_changed:
-        stem = Path(p).stem
-        if stem not in seen_changed:
-            seen_changed.add(stem)
-            unique_cloth_changed.append(p)
-    data["cloth_changed"] = [to_project_relative(project, Path(p)) for p in unique_cloth_changed]
+    data["cloth"] = [
+        to_project_relative(project, Path(p))
+        for p in list_files(assets / "cloth_images", (".png", ".jpg", ".jpeg"))
+    ]
+    data["cloth_changed"] = [
+        to_project_relative(project, Path(p))
+        for p in list_files(assets / "cloth_changed_images", (".png", ".jpg", ".jpeg"))
+    ]
     chapters_dir = assets / "storyboards"
     if chapters_dir.exists():
         for chapter in sorted(chapters_dir.iterdir()):
@@ -1863,7 +1833,9 @@ def _clean_tos_for_flow(flow: str) -> Dict[str, Any]:
             "cloth_changed",
         }
         return _clean_tos_visual_audio_assets(tos, bucket, phases)
-    if flow == "fenjing":
+    if flow in {"fenjing", "fenjing_generate"}:
+        return _delete_tos_prefix(tos, bucket, runtime_config.TOS_FENJING_PREFIX)
+    if flow == "fenjing_upload":
         return _delete_tos_prefix(tos, bucket, runtime_config.TOS_FENJING_PREFIX)
     if flow == "video":
         return _delete_tos_prefix(tos, bucket, runtime_config.TOS_VIDEO_PREFIX)
@@ -1871,10 +1843,7 @@ def _clean_tos_for_flow(flow: str) -> Dict[str, Any]:
 
 
 def clean_stage_assets(project: str, flow: str) -> Dict[str, Any]:
-    # 兼容旧的 workflow 名称，统一映射到 fenjing
-    if flow in {"fenjing_generate", "fenjing_upload"}:
-        flow = "fenjing"
-    if flow not in {"auto_storyboard", "visual_audio_assets", "fenjing", "video"}:
+    if flow not in {"auto_storyboard", "visual_audio_assets", "fenjing", "fenjing_generate", "fenjing_upload", "video"}:
         return {"ok": False, "error": "invalid_flow"}
     assets = storyboard_assets_dir(project)
     base = project_base_dir(project)
@@ -1931,13 +1900,15 @@ def clean_stage_assets(project: str, flow: str) -> Dict[str, Any]:
                             _remove_path(sub_item, removed, errors)
                         if sub_item.is_file() and sub_item.name == "fenjing_prompts.jsonl":
                             _remove_path(sub_item, removed, errors)
-    elif flow == "fenjing":
+    elif flow in {"fenjing", "fenjing_generate"}:
         storyboards_dir = assets / "storyboards"
         if storyboards_dir.exists():
             for item in sorted(storyboards_dir.iterdir()):
                 if item.is_dir() and CHAPTER_PATTERN.match(item.name):
                     _remove_path(item / "fenjing_images", removed, errors)
                     _remove_path(item / "fenjing_candidates", removed, errors)
+    elif flow == "fenjing_upload":
+        pass
     elif flow == "video":
         _remove_path(assets / "video", removed, errors)
         _remove_path(base / "video", removed, errors)
