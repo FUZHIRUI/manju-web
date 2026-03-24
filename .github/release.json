@@ -1,0 +1,8 @@
+{
+  "tag_name": "v0.1.0",
+  "target_commitish": "main",
+  "name": "v0.1.0 - Initial Release",
+  "body": "## Initial Release\n\n- Basic manju-web application structure\n- Frontend + Backend codebase",
+  "draft": false,
+  "prerelease": false
+}
