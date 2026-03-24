@@ -25,6 +25,19 @@ backend/manju_output/
 # Auth-related docs and secrets
 backend/config/global_auth.json
 
+# IDE / AI tools
+.claude/
+.cursor/
+skills/
+
+# Generated docs / temp files
+AGENTS.md
+IMPROVEMENTS_SUMMARY.md
+report.md
+verify_improvements.py
+design_docs/
+nohup.out
+
 # Misc
 frontend/.cache/
 *.bak
