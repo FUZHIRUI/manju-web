@@ -5896,7 +5896,7 @@ async function clearPendingFlow(flow) {
   await apiPost(`/api/projects/${state.selectedProject}/flow/${flow}/pending/clear`);
 }
 
-async function executeFlowFull(flow) {
+async function executeFlowFull(flow, options) {
   if (!state.selectedProject) {
     return;
   }
@@ -5920,15 +5920,6 @@ async function executeFlowFull(flow) {
       window.alert("清理阶段资产失败");
       return;
     }
-  }
-  setFlowTouched(state.selectedProject, flow);
-  await clearPendingFlow(flow);
-  try {
-    await apiPost(`/api/projects/${state.selectedProject}/clean/${flow}`);
-    await refreshAssets();
-  } catch (err) {
-    window.alert("清理阶段资产失败");
-    return;
   }
   const job = await apiPost(`/api/projects/${state.selectedProject}/run/${flow}`, {});
   state.jobs = state.jobs.filter(j => !j.id.startsWith(`pending_${flow}_`));
