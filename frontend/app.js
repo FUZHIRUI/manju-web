@@ -5921,7 +5921,8 @@ async function executeFlowFull(flow, options) {
       return;
     }
   }
-  const job = await apiPost(`/api/projects/${state.selectedProject}/run/${flow}`, {});
+  const body = phase ? { phase } : {};
+  const job = await apiPost(`/api/projects/${state.selectedProject}/run/${flow}`, body);
   state.jobs = state.jobs.filter(j => !j.id.startsWith(`pending_${flow}_`));
   setJobs([job, ...state.jobs]);
   renderJobs();

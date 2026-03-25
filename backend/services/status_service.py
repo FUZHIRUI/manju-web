@@ -1,9 +1,39 @@
+import threading
 import time
 from copy import deepcopy
 from typing import Any, Dict, Optional
 
 from ..repositories import project_repo, status_repo
 from .workflow_runtime.io_jsonl import read_jsonl
+
+
+_project_locks: Dict[str, threading.Lock] = {}
+_locks_guard = threading.Lock()
+
+
+def _get_project_lock(project: str) -> threading.Lock:
+    with _locks_guard:
+        if project not in _project_locks:
+            _project_locks[project] = threading.Lock()
+        return _project_locks[project]
+
+
+def _recalculate_flow_status(flow: str, steps: Dict[str, str]) -> str:
+    """根据所有 step 状态推算 flow 整体状态"""
+    statuses = list(steps.values())
+    if not statuses:
+        return _STATUS_WAITING
+    if all(s == _STATUS_COMPLETED for s in statuses):
+        return _STATUS_COMPLETED
+    if any(s == _STATUS_ERROR for s in statuses):
+        return _STATUS_ERROR
+    if any(s == _STATUS_PARTIAL_RETURNED for s in statuses):
+        return _STATUS_PARTIAL_RETURNED
+    if any(s == _STATUS_PARTIAL_COMPLETED for s in statuses):
+        return _STATUS_PARTIAL_COMPLETED
+    if any(s == _STATUS_RUNNING for s in statuses):
+        return _STATUS_RUNNING
+    return _STATUS_WAITING
 
 
 _STATUS_WAITING = "waiting"
