@@ -48,8 +48,6 @@ DEFAULT_LOCATION_PROMPT_THINKING = "enabled"  # 默认开启场景提示词思�
 DEFAULT_LOCATION_PROMPT_REASONING_EFFORT = "medium"  # 默认中等强度，平衡速度
 DEFAULT_TTS_PROMPT_THINKING = "enabled"  # 默认开启解说词思考，提升表达质量
 DEFAULT_TTS_PROMPT_REASONING_EFFORT = "medium"  # 默认中等强度，避免过慢
-DEFAULT_QC_THINKING = "enabled"  # 当前人物质检在使用
-DEFAULT_QC_REASONING_EFFORT = "low"  
 DEFAULT_FENJING_THINKING = "enabled"  # 默认开启分镜提示词思考，增强可用性
 DEFAULT_FENJING_REASONING_EFFORT = "high"  # 默认高强度，优先保证提示词质量
 

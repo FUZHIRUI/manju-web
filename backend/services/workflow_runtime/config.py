@@ -185,8 +185,6 @@ class PhaseConfig:
     location_prompt_reasoning_effort: str = ""
     tts_prompt_thinking: str = ""
     tts_prompt_reasoning_effort: str = ""
-    qc_thinking: str = ""
-    qc_reasoning_effort: str = ""
     fenjing_thinking: str = ""
     fenjing_reasoning_effort: str = ""
 
@@ -203,8 +201,6 @@ class PhaseConfig:
         self.location_prompt_reasoning_effort = _get_env("LOCATION_PROMPT_REASONING_EFFORT", config_defaults.DEFAULT_LOCATION_PROMPT_REASONING_EFFORT) or ""
         self.tts_prompt_thinking = _get_env("TTS_PROMPT_THINKING", config_defaults.DEFAULT_TTS_PROMPT_THINKING) or ""
         self.tts_prompt_reasoning_effort = _get_env("TTS_PROMPT_REASONING_EFFORT", config_defaults.DEFAULT_TTS_PROMPT_REASONING_EFFORT) or ""
-        self.qc_thinking = _get_env("QC_THINKING", config_defaults.DEFAULT_QC_THINKING) or ""
-        self.qc_reasoning_effort = _get_env("QC_REASONING_EFFORT", config_defaults.DEFAULT_QC_REASONING_EFFORT) or ""
         self.fenjing_thinking = _get_env("FENJING_THINKING", config_defaults.DEFAULT_FENJING_THINKING) or ""
         self.fenjing_reasoning_effort = _get_env("FENJING_REASONING_EFFORT", config_defaults.DEFAULT_FENJING_REASONING_EFFORT) or ""
 

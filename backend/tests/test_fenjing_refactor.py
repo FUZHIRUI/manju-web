@@ -134,7 +134,6 @@ class TestImportPathUpdates:
             generate_and_download_with_refs,
             generate_image,
             generate_image_with_refs,
-            qc_image_async,
             run_async,
             size_for_2k_9x16,
             TosClientWrapper,
@@ -148,7 +147,6 @@ class TestImportPathUpdates:
         assert callable(generate_and_download_with_refs)
         assert callable(generate_image)
         assert callable(generate_image_with_refs)
-        assert callable(qc_image_async)
         assert callable(run_async)
         assert callable(size_for_2k_9x16)
         assert callable(with_thread_pool_limit)

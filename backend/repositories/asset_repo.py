@@ -296,12 +296,10 @@ def build_character_details(project: str, assets: Path) -> List[Dict[str, Any]]:
             match = re.match(r"(.+)_\d+$", p.stem)
             cid = match.group(1) if match else p.stem
             candidate_map.setdefault(cid, []).append(to_project_relative(project, p))
-    qc_map = _load_character_qc_map(project)
     ids = sorted(set(prompt_map.keys()) | set(main_map.keys()) | set(candidate_map.keys()))
     rows: List[Dict[str, Any]] = []
     for cid in ids:
         image_path = to_project_relative(project, main_map[cid]) if cid in main_map else ""
-        qc_info = qc_map.get(cid, {})
         rows.append(
             {
                 "character_id": cid,
@@ -309,9 +307,6 @@ def build_character_details(project: str, assets: Path) -> List[Dict[str, Any]]:
                 "prompt": prompt_map.get(cid, ""),
                 "image_path": image_path,
                 "candidate_images": candidate_map.get(cid, []),
-                "qc_pass": qc_info.get("qc_pass"),
-                "qc_attempts": qc_info.get("qc_attempts", 0),
-                "qc_reason": qc_info.get("reason", ""),
             }
         )
     return rows
@@ -746,33 +741,12 @@ def build_visual_audio_asset_results(
     data = list_project_assets(project)
     now = time.time()
     results: List[Dict[str, Any]] = []
-    qc_map = _load_character_qc_map(project)
     allowed_types = {"character", "location"} if allowed_missing_output_types is None else set(allowed_missing_output_types)
     if "character" in allowed_types:
         character_details = data.get("character_details") or []
         for item in character_details:
             char_id = str(item.get("character_id") or "")
             if not char_id:
-                continue
-            qc_info = qc_map.get(char_id)
-            if qc_info:
-                status = "success" if qc_info.get("qc_pass") else "failed"
-                results.append(
-                    _build_asset_result(
-                        job_id=job_id,
-                        project=project,
-                        flow="visual_audio_assets",
-                        asset_type="character",
-                        asset_id=char_id,
-                        file=item.get("image_path") or qc_info.get("file") or "",
-                        status=status,
-                        reason=qc_info.get("reason") or "",
-                        retry_count=qc_info.get("retry_count") or 0,
-                        qc_limit=qc_info.get("qc_limit") or 0,
-                        source="qc_result",
-                        created_at=now,
-                    )
-                )
                 continue
             status = "success" if item.get("image_path") else "failed"
             reason = "" if status == "success" else "missing_output"
@@ -787,7 +761,6 @@ def build_visual_audio_asset_results(
                     status=status,
                     reason=reason,
                     retry_count=0,
-                    qc_limit=0,
                     source="runtime",
                     created_at=now,
                 )
@@ -814,7 +787,6 @@ def build_visual_audio_asset_results(
                     status=status,
                     reason=reason,
                     retry_count=0,
-                    qc_limit=0,
                     source="runtime",
                     created_at=now,
                 )
@@ -845,7 +817,6 @@ def build_fenjing_asset_results(job_id: str, project: str) -> List[Dict[str, Any
                     status=status,
                     reason=reason,
                     retry_count=0,
-                    qc_limit=0,
                     source="runtime",
                     created_at=now,
                     chapter_id=str(chapter),
@@ -877,7 +848,6 @@ def build_video_asset_results(job_id: str, project: str) -> List[Dict[str, Any]]
                     status=status,
                     reason=reason,
                     retry_count=0,
-                    qc_limit=0,
                     source="runtime",
                     created_at=now,
                     chapter_id=chapter,
@@ -899,7 +869,6 @@ def build_video_asset_results(job_id: str, project: str) -> List[Dict[str, Any]]
                     status="success",
                     reason="",
                     retry_count=0,
-                    qc_limit=0,
                     source="runtime",
                     created_at=now,
                     chapter_id=chapter,
@@ -907,34 +876,6 @@ def build_video_asset_results(job_id: str, project: str) -> List[Dict[str, Any]]
                 )
             )
     return results
-
-
-def build_partial_failures_from_qc(job_id: str, project: str) -> List[Dict[str, Any]]:
-    qc_map = _load_character_qc_map(project)
-    if not qc_map:
-        return []
-    now = time.time()
-    failed: List[Dict[str, Any]] = []
-    for char_id, qc_info in qc_map.items():
-        if qc_info.get("qc_pass"):
-            continue
-        failed.append(
-            _build_asset_result(
-                job_id=job_id,
-                project=project,
-                flow="visual_audio_assets",
-                asset_type="character",
-                asset_id=char_id,
-                file=qc_info.get("file") or "",
-                status="failed",
-                reason=qc_info.get("reason") or "qc_failed",
-                retry_count=qc_info.get("retry_count") or 0,
-                qc_limit=qc_info.get("qc_limit") or 0,
-                source="qc_result",
-                created_at=now,
-            )
-        )
-    return failed
 
 
 def _build_asset_result(
@@ -947,7 +888,6 @@ def _build_asset_result(
     status: str,
     reason: str,
     retry_count: int,
-    qc_limit: int,
     source: str,
     created_at: float,
     chapter_id: str = "",
@@ -964,61 +904,11 @@ def _build_asset_result(
         "status": status,
         "reason": reason,
         "retry_count": retry_count,
-        "qc_limit": qc_limit,
         "source": source,
         "created_at": created_at,
         "chapter_id": chapter_id,
         "fenjing_id": fenjing_id,
     }
-
-
-def _load_character_qc_map(project: str) -> Dict[str, Dict[str, Any]]:
-    qc_path = storyboard_assets_dir(project) / "character_qc_results.jsonl"
-    items = safe_read_jsonl(qc_path)
-    result: Dict[str, Dict[str, Any]] = {}
-    for item in items:
-        file_path = str(item.get("file") or "")
-        stem = Path(file_path).stem if file_path else ""
-        if not stem:
-            continue
-        qc_pass = item.get("qc_pass")
-        if qc_pass is None and isinstance(item.get("qc"), dict):
-            qc_content = item.get("qc", {}).get("content") or ""
-            qc_pass = _extract_qc_pass(qc_content)
-        qc_attempts = item.get("qc_attempts")
-        retry_count = max(int(qc_attempts) - 1, 0) if isinstance(qc_attempts, int) else 0
-        qc_limit = int(qc_attempts) if isinstance(qc_attempts, int) else 0
-        result[stem] = {
-            "file": file_path,
-            "qc_pass": bool(qc_pass),
-            "reason": _extract_qc_reason(item),
-            "retry_count": retry_count,
-            "qc_limit": qc_limit,
-        }
-    return result
-
-
-def _extract_qc_pass(content: str) -> bool:
-    try:
-        payload = json.loads(content)
-        return bool(payload.get("check_result"))
-    except Exception:
-        return False
-
-
-def _extract_qc_reason(item: Dict[str, Any]) -> str:
-    if isinstance(item.get("check_ana"), str):
-        return item.get("check_ana") or ""
-    qc = item.get("qc")
-    if isinstance(qc, dict):
-        content = qc.get("content")
-        if isinstance(content, str):
-            try:
-                payload = json.loads(content)
-                return str(payload.get("check_ana") or "")
-            except Exception:
-                return ""
-    return ""
 
 
 def _extract_location_ids(location_table: List[Dict[str, Any]]) -> List[str]:
@@ -1882,7 +1772,6 @@ def clean_stage_assets(project: str, flow: str) -> Dict[str, Any]:
             assets / "location_prompts.jsonl",
             assets / "character_prompts_from_tos.jsonl",
             assets / "location_prompts_from_tos.jsonl",
-            assets / "character_qc_results.jsonl",
             assets / "cloth_upload.jsonl",
             assets / "cloth_changed_upload.jsonl",
         ]
@@ -1985,7 +1874,6 @@ def clean_visual_audio_assets_by_phase(project: str, phase: str) -> Dict[str, An
             assets / "character_prompts_from_tos.jsonl",
             assets / "character_images",
             assets / "character_candidates",
-            assets / "character_qc_results.jsonl",
         ]
     if "location_prompts" in phases:
         targets += [

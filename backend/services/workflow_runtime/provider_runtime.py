@@ -909,57 +909,6 @@ def run_async(coro_or_factory: Any) -> Any:
         return asyncio.run(coro)
 
 
-async def qc_image_async(
-    system_prompt: str,
-    image_url: str,
-    user_text: Optional[str] = None,
-    thinking: Optional[str] = None,
-    reasoning_effort: Optional[str] = None,
-) -> Dict[str, Any]:
-    return await qc_image(system_prompt, image_url, user_text, thinking, reasoning_effort)
-
-
-async def qc_image(
-    system_prompt: str,
-    image_url: str,
-    user_text: Optional[str] = None,
-    thinking: Optional[str] = None,
-    reasoning_effort: Optional[str] = None,
-    model: Optional[str] = None,
-) -> Dict[str, Any]:
-    limiter = await throttle_service.acquire_model_limit("ark")
-    try:
-        user_content = [{"type": "text", "text": user_text}] if user_text else [{"type": "text", "text": "请根据系统提示词检查这张图片，返回 JSON 格式的检查结果。"}]
-        user_content.append({"type": "image_url", "image_url": {"url": image_url}})
-        messages = [
-            {"role": "system", "content": [{"type": "text", "text": system_prompt}]},
-            {"role": "user", "content": user_content},
-        ]
-        data = await _ark_chat_completion(
-            messages=messages,
-            model=model or runtime_config.ARK_VLM_MODEL,
-            thinking=thinking,
-            reasoning_effort=reasoning_effort,
-            api_name="ark_vlm",
-        )
-        content = ""
-        if isinstance(data, dict):
-            choices = data.get("choices")
-            if isinstance(choices, list) and choices:
-                choice = choices[0]
-                if isinstance(choice, dict):
-                    message = choice.get("message")
-                    if isinstance(message, dict):
-                        content_val = message.get("content")
-                        if isinstance(content_val, str):
-                            content = content_val
-        return {"content": content}
-    finally:
-        if limiter:
-            limiter.release()
-
-
-
 
 async def tts_single_request(
     session: aiohttp.ClientSession,

@@ -180,18 +180,12 @@ class AssetStatsCalculator:
         """
         status = result_item.get("status")
         retry = int(result_item.get("retry_count") or 0)
-        source = str(result_item.get("source") or "")
         reason = str(result_item.get("reason") or "")
 
         if status == "success":
             stat.success += 1
             if chapter_stat is not None:
                 chapter_stat["success"] += 1
-        elif source == "qc_result" and status == "failed":
-            stat.retry_count += max(1, retry)
-            if chapter_stat is not None:
-                chapter_stat["retry"] += max(1, retry)
-            return
         elif reason == "missing_output":
             stat.failed += 1
             if chapter_stat is not None:

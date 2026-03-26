@@ -421,7 +421,7 @@ def generate_fenjing_images(
             return f"tos://{bucket}/{key}" if key else ""
         return ""
 
-    async def process_single_fenjing_with_qc(idx: int, item: Dict[str, Any], fen_id: int, refs: List[str], prompt_text: str) -> Optional[Dict[str, Any]]:
+    async def process_single_fenjing(idx: int, item: Dict[str, Any], fen_id: int, refs: List[str], prompt_text: str) -> Optional[Dict[str, Any]]:
         fenjing_info = f"[fenjing{fen_id}] "
         fenjing_label = f"{chapter_label}{fenjing_info}"
         
@@ -445,11 +445,9 @@ def generate_fenjing_images(
         
         def add_attempt_record(
             attempt_status: str,
-            qc_passed: Optional[bool],
             file_path: Optional[Path] = None,
             uri_val: Optional[str] = None,
             presigned_val: Optional[str] = None,
-            qc_result: Optional[Dict[str, Any]] = None,
             recheck_result: Optional[Dict[str, Any]] = None,
             ref_urls: Optional[List[str]] = None,
             origin_image_url: str = ""
@@ -466,8 +464,6 @@ def generate_fenjing_images(
                 "file": file_path.name if isinstance(file_path, Path) else None,
                 "uri": uri_val,
                 "presigned": presigned_val,
-                "qc_passed": qc_passed,
-                "qc_result": qc_result,
                 "recheck_result": recheck_result,
                 "ref_urls": ";".join(refs_list),
                 "ref_tos_uris": ";".join(tos_uris),
@@ -509,11 +505,11 @@ def generate_fenjing_images(
                             fenjing_id=str(fen_id),
                             data={"image_type": "fenjing", "image_id": str(fen_id), "ok": False, "reason": "missing_prefix"},
                         )
-                        return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": None, "presigned": None, "qc_passed": None, "attempt_records": attempt_records, "origin_image_url": ""}
+                        return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": None, "presigned": None, "attempt_records": attempt_records, "origin_image_url": ""}
                     key = f"{tos_fenjing_prefix}/{chapter_name}/{p.name}" if chapter_name else f"{tos_fenjing_prefix}/{p.name}"
                     uri = tos.upload_file(runtime_config.TOS_BUCKET, key, p) if tos.available() else None
                     presigned = tos.presign_get(runtime_config.TOS_BUCKET, key) if tos.available() else None
-                    add_attempt_record("generated", None, file_path=p, uri_val=uri, presigned_val=presigned, ref_urls=refs, origin_image_url="")
+                    add_attempt_record("generated", file_path=p, uri_val=uri, presigned_val=presigned, ref_urls=refs, origin_image_url="")
                     emit_event(
                         "INFO",
                         "fenjing",
@@ -550,10 +546,10 @@ def generate_fenjing_images(
                             "image_id": str(fen_id),
                         },
                     )
-                    return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": uri, "presigned": presigned, "qc_passed": None, "attempt_records": attempt_records, "origin_image_url": ""}
+                    return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": uri, "presigned": presigned, "attempt_records": attempt_records, "origin_image_url": ""}
             if not result or "data" not in result or not result["data"]:
                 log_debug(f"[ERROR] {fenjing_label}Generation Failed - fenjing_id: {fen_id}, Attempt: {attempts}")
-                add_attempt_record("generation_failed", None, ref_urls=refs, origin_image_url=origin_image_url)
+                add_attempt_record("generation_failed", ref_urls=refs, origin_image_url=origin_image_url)
                 if attempts <= retry:
                     continue
                 emit_event(
@@ -578,11 +574,11 @@ def generate_fenjing_images(
                     fenjing_id=str(fen_id),
                     data={"attempt": attempts, "max_attempts": retry + 1, "reason": "generation_failed"},
                 )
-                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "qc_passed": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
+                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
             image_url = result["data"][0].get("url") if isinstance(result["data"][0], dict) else None
             if not isinstance(image_url, str) or not image_url:
                 log_debug(f"[ERROR] {fenjing_label}Generation Failed - fenjing_id: {fen_id}, Attempt: {attempts}")
-                add_attempt_record("generation_failed", None, ref_urls=refs, origin_image_url=origin_image_url)
+                add_attempt_record("generation_failed", ref_urls=refs, origin_image_url=origin_image_url)
                 if attempts <= retry:
                     continue
                 emit_event(
@@ -607,14 +603,14 @@ def generate_fenjing_images(
                     fenjing_id=str(fen_id),
                     data={"attempt": attempts, "max_attempts": retry + 1, "reason": "empty_url"},
                 )
-                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "qc_passed": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
+                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
             origin_image_url = image_url
             save_path = out_dir / f"{name_prefix}.png"
             ok = await download(image_url, save_path)
             p = save_path if ok else None
             if not isinstance(p, Path):
                 log_debug(f"[ERROR] {fenjing_label}Generation Failed - fenjing_id: {fen_id}, Attempt: {attempts}")
-                add_attempt_record("generation_failed", None, ref_urls=refs, origin_image_url=origin_image_url)
+                add_attempt_record("generation_failed", ref_urls=refs, origin_image_url=origin_image_url)
                 if attempts <= retry:
                     continue
                 emit_event(
@@ -639,7 +635,7 @@ def generate_fenjing_images(
                     fenjing_id=str(fen_id),
                     data={"attempt": attempts, "max_attempts": retry + 1, "reason": "download_failed"},
                 )
-                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "qc_passed": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
+                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
             
             # 使用项目特定的TOS前缀，支持多项目并行
             project_prefixes = runtime_config.get_project_prefixes(project_name) if project_name else {}
@@ -656,12 +652,12 @@ def generate_fenjing_images(
                     fenjing_id=str(fen_id),
                     data={"image_type": "fenjing", "image_id": str(fen_id), "ok": False, "reason": "missing_prefix"},
                 )
-                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": None, "presigned": None, "qc_passed": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
+                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": None, "presigned": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
             key = f"{tos_fenjing_prefix}/{chapter_name}/{p.name}" if chapter_name else f"{tos_fenjing_prefix}/{p.name}"
             uri = tos.upload_file(runtime_config.TOS_BUCKET, key, p) if tos.available() else None
             presigned = tos.presign_get(runtime_config.TOS_BUCKET, key) if tos.available() else None
             
-            add_attempt_record("generated", None, file_path=p, uri_val=uri, presigned_val=presigned, ref_urls=refs, origin_image_url=origin_image_url)
+            add_attempt_record("generated", file_path=p, uri_val=uri, presigned_val=presigned, ref_urls=refs, origin_image_url=origin_image_url)
             emit_event(
                 "INFO",
                 "fenjing",
@@ -698,7 +694,7 @@ def generate_fenjing_images(
                     "image_id": str(fen_id),
                 },
             )
-            return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": uri, "presigned": presigned, "qc_passed": None, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
+            return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": uri, "presigned": presigned, "attempt_records": attempt_records, "origin_image_url": origin_image_url}
     
     with with_thread_pool_limit() as pool:
         futures = []
@@ -805,7 +801,7 @@ def generate_fenjing_images(
                     payload_preview = build_image_payload(prompt_text, refs)
                     log_debug(f"[INFO] {fenjing_label}Image payload preview - fenjing_id: {fen_id}, image: {json.dumps(payload_preview.get('image', []), ensure_ascii=False)[:200]}...")
                     log_debug(f"[INFO] {fenjing_label}Fenjing Character mapping - fenjing_id: {fen_id}, characters: {[pk + '=' + item.get(pk) for pk in char_keys]}")
-                    futures.append(pool.submit(lambda: run_async(process_single_fenjing_with_qc(idx, item, fen_id, refs, prompt_text))))
+                    futures.append(pool.submit(lambda: run_async(process_single_fenjing(idx, item, fen_id, refs, prompt_text))))
         
         for fut in as_completed(futures):
             r = fut.result()
@@ -863,7 +859,7 @@ def run_fenjing_workflow_multi(project_name: Optional[str] = None) -> Dict[str, 
             step="start",
             project=actual_project_name,
         )
-        return {"chapters": [], "cloth_changed_upload": [], "fenjing_qc_csv": [], "fenjing_qc_csvs": {}}
+        return {"chapters": [], "cloth_changed_upload": [],}
 
     # 获取项目特定的TOS前缀
     project_prefixes = runtime_config.get_project_prefixes(actual_project_name)
@@ -877,7 +873,7 @@ def run_fenjing_workflow_multi(project_name: Optional[str] = None) -> Dict[str, 
             step="start",
             project=actual_project_name,
         )
-        return {"chapters": [], "cloth_changed_upload": [], "fenjing_qc_csv": [], "fenjing_qc_csvs": {}}
+        return {"chapters": [], "cloth_changed_upload": [],}
     
     try:
         # Phase: generate_images，生成分镜图像并进入上传流程
@@ -1107,8 +1103,6 @@ def run_fenjing_workflow_multi(project_name: Optional[str] = None) -> Dict[str, 
         return {
             "chapters": chapters_result,
             "cloth_changed_upload": cloth_changed_upload,
-            "fenjing_qc_csv": [],
-            "fenjing_qc_csvs": {}
         }
     except (IOError, OSError, ValueError) as e:
         emit_event(
@@ -1137,7 +1131,7 @@ def run_fenjing_generate_workflow(project_name: Optional[str] = None) -> Dict[st
             step="start",
             project=actual_project_name,
         )
-        return {"chapters": [], "fenjing_qc_csv": [], "fenjing_qc_csvs": {}}
+        return {"chapters": [],}
 
     project_prefixes = runtime_config.get_project_prefixes(actual_project_name)
     tos_assets_prefix = project_prefixes.get("TOS_ASSETS_PREFIX", "")
@@ -1150,7 +1144,7 @@ def run_fenjing_generate_workflow(project_name: Optional[str] = None) -> Dict[st
             step="start",
             project=actual_project_name,
         )
-        return {"chapters": [], "fenjing_qc_csv": [], "fenjing_qc_csvs": {}}
+        return {"chapters": [],}
 
     try:
         emit_event(
@@ -1363,8 +1357,6 @@ def run_fenjing_generate_workflow(project_name: Optional[str] = None) -> Dict[st
         )
         return {
             "chapters": chapters_result,
-            "fenjing_qc_csv": [],
-            "fenjing_qc_csvs": {}
         }
     except (IOError, OSError, ValueError) as e:
         emit_event(
@@ -1483,7 +1475,7 @@ def generate_fenjing_images_local(
                         fenjing_id=str(fen_id),
                         data={"file": p.name, "image_type": "fenjing", "image_id": str(fen_id)},
                     )
-                    return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": None, "presigned": None, "qc_passed": None}
+                    return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": None, "presigned": None}
 
             if not result or "data" not in result or not result["data"]:
                 if attempts <= retry:
@@ -1499,7 +1491,7 @@ def generate_fenjing_images_local(
                     fenjing_id=str(fen_id),
                     data={"attempt": attempts, "image_type": "fenjing", "image_id": str(fen_id)},
                 )
-                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "qc_passed": None}
+                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None}
 
             image_url = result["data"][0].get("url") if isinstance(result["data"][0], dict) else None
             if not isinstance(image_url, str) or not image_url:
@@ -1516,7 +1508,7 @@ def generate_fenjing_images_local(
                     fenjing_id=str(fen_id),
                     data={"attempt": attempts, "image_type": "fenjing", "image_id": str(fen_id)},
                 )
-                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "qc_passed": None}
+                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None}
 
             save_path = out_dir / f"{name_prefix}.png"
             ok = await download(image_url, save_path)
@@ -1535,7 +1527,7 @@ def generate_fenjing_images_local(
                     fenjing_id=str(fen_id),
                     data={"attempt": attempts, "image_type": "fenjing", "image_id": str(fen_id)},
                 )
-                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "qc_passed": None}
+                return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None}
 
             emit_event(
                 "INFO",
@@ -1548,9 +1540,9 @@ def generate_fenjing_images_local(
                 fenjing_id=str(fen_id),
                 data={"file": p.name, "image_type": "fenjing", "image_id": str(fen_id)},
             )
-            return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": None, "presigned": None, "qc_passed": None}
+            return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": p.name, "uri": None, "presigned": None}
 
-        return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None, "qc_passed": None}
+        return {"fenjing_id": fen_id, "prompt_text": prompt_text, "file": None, "uri": None, "presigned": None}
 
     with with_thread_pool_limit() as pool:
         futures = []

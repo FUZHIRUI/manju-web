@@ -1951,7 +1951,7 @@ const FLOW_TREE_CONFIG = {
         ],
         fallbackStart: ["Generating Character Images"],
         fallbackComplete: [],
-        errorPatterns: ["image", "QC"]
+        errorPatterns: ["image"]
       },
       {
         id: "generate_tts",
@@ -3967,8 +3967,6 @@ function renderCharactersPanel(data) {
     card.className = "character-card" + (item.character_id === state.selectedCharacterId ? " active" : "");
     if (!item.image_path) {
       card.classList.add("missing-asset");
-    } else if (item.qc_pass === false) {
-      card.classList.add("qc-failed-asset");
     }
     card.dataset.characterId = item.character_id || "";
     const thumb = document.createElement("div");
@@ -3978,13 +3976,6 @@ function renderCharactersPanel(data) {
       img.src = mediaUrl(item.image_path);
       img.loading = "lazy";
       thumb.appendChild(img);
-      if (item.qc_pass === false) {
-        const badge = document.createElement("div");
-        badge.className = "qc-failed-badge";
-        badge.textContent = "QC失败";
-        badge.title = item.qc_reason || "质量检查未通过";
-        thumb.appendChild(badge);
-      }
     } else {
       const placeholder = document.createElement("div");
       placeholder.className = "asset-placeholder";
@@ -4005,12 +3996,6 @@ function renderCharactersPanel(data) {
       title.textContent = `角色 ${charId}`;
     }
     meta.appendChild(title);
-    if (item.qc_pass === false && item.qc_reason) {
-      const reasonTag = document.createElement("div");
-      reasonTag.className = "qc-reason-tag";
-      reasonTag.textContent = item.qc_reason;
-      meta.appendChild(reasonTag);
-    }
     card.appendChild(thumb);
     card.appendChild(meta);
     card.onclick = () => {

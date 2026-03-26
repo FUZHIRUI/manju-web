@@ -12,7 +12,7 @@ workflow_runtime 包 - 小说视频生成工作流运行时模块
 
 【子模块说明】
 - auto_storyboard: Phase 1/2 分镜剧本生成
-- fenjing: 分镜图像生成与QC质检
+- fenjing: 分镜图像生成
 - video: 视频任务创建、轮询、下载、上传
 - visual_audio_assets: 角色/地点/服装图像 + TTS音频生成
 - provider_runtime: API提供商统一封装(Ark/TTS/TOS)

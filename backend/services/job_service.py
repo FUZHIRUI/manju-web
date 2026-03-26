@@ -88,8 +88,6 @@ def get_job_partial_failures(job_id: str) -> Optional[Dict[str, Any]]:
         return None
     flow = _resolve_flow_from_job(job.get("type"))
     items = asset_repo.list_asset_results(project, job_id=job_id, status="failed")
-    if not items:
-        items = asset_repo.build_partial_failures_from_qc(job_id, project)
     summary = asset_repo.aggregate_partial_failures(items)
     return {
         "job_id": job_id,

@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from . import runtime_config
 from .io_jsonl import read_jsonl, write_jsonl
 from .provider_runtime import (
-    TosClientWrapper, chat, generate_tts_audios, qc_image_async, generate_and_download, generate_and_download_with_refs, run_async, emit_event,
+    TosClientWrapper, chat, generate_tts_audios, generate_and_download, generate_and_download_with_refs, run_async, emit_event,
     with_concurrency_limit,
     generate_image,
 )
@@ -872,23 +872,14 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
             cloth_map[cloth_id] = presigned
     defaults = load_char_defaults(chars_jsonl_path)
 
-    qc_prompt_path = PROMPT_DIR / "character_cloth_qc.txt"
-    sys_prompt = read_text(str(qc_prompt_path)) if qc_prompt_path.exists() else None
-    thinking = runtime_config.QC_THINKING if runtime_config.QC_THINKING != "disabled" else None
-    reasoning_effort = runtime_config.QC_REASONING_EFFORT if runtime_config.QC_REASONING_EFFORT != "disabled" else None
-
     results: List[Dict[str, Any]] = []
 
-    async def process_single_image_with_qc(cid: str, oid: str, char_ref: Optional[str], cloth_ref: Optional[str]) -> Optional[Dict[str, Any]]:
+    async def process_single_image(cid: str, oid: str, char_ref: Optional[str], cloth_ref: Optional[str]) -> Optional[Dict[str, Any]]:
         prompt = "高质量真人摄影，正面及侧面形象拍摄，**纯白色背景**，采用影视级渲染效果。参考图中的人物站立，全身拍摄。给参考图中的人物换上服装参考图的衣服，穿的鞋不变，并在水平方向展示角色的正视、侧视图形象，保持人物形象不得改变。"
         name_prefix = f"{cid}_{oid}"
 
         retry = 5
         attempts = 0
-        last_p = None
-        last_uri = None
-        last_presigned = None
-        last_qc_result = None
 
         while attempts <= retry:
             attempts += 1
@@ -946,18 +937,12 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
                 )
                 if attempts <= retry:
                     continue
-                if last_p:
-                    return {"character_id": cid, "outfit_id": oid, "file": last_p.name, "uri": last_uri, "presigned": last_presigned, "qc_passed": False, "qc_result": last_qc_result, "char_ref": char_ref, "cloth_ref": cloth_ref}
                 return None
 
             key = f"{tos_cloth_prefix}/{p.name}" if tos_cloth_prefix else ""
             uri = tos.upload_file(runtime_config.TOS_BUCKET, key, p) if (tos.available() and key) else None
             presigned = tos.presign_get(runtime_config.TOS_BUCKET, key) if (tos.available() and key) else None
-            
-            last_p = p
-            last_uri = uri
-            last_presigned = presigned
-            
+
             emit_event(
                 "INFO",
                 "visual_audio_assets",
@@ -977,88 +962,8 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
                 },
             )
 
-            if not sys_prompt or not presigned:
-                emit_event(
-                    "INFO",
-                    "visual_audio_assets",
-                    "qc_skipped",
-                    f"QC Skipped - Character: {cid}, Outfit: {oid}, No QC prompt or presigned URL",
-                    step="cloth_changed",
-                    project=project_name,
-                    data={"character_id": cid, "outfit_id": oid},
-                )
-                return {"character_id": cid, "outfit_id": oid, "file": p.name, "uri": uri, "presigned": presigned, "qc_passed": None, "char_ref": char_ref, "cloth_ref": cloth_ref}
+            return {"character_id": cid, "outfit_id": oid, "file": p.name, "uri": uri, "presigned": presigned, "char_ref": char_ref, "cloth_ref": cloth_ref}
 
-            emit_event(
-                "INFO",
-                "visual_audio_assets",
-                "qc_check",
-                f"QC Check - Character: {cid}, Outfit: {oid}, Attempt: {attempts}",
-                step="cloth_changed",
-                project=project_name,
-                data={"character_id": cid, "outfit_id": oid, "attempt": attempts},
-            )
-            r = await qc_image_async(sys_prompt, presigned, thinking=thinking, reasoning_effort=reasoning_effort)
-            last_qc_result = r
-
-            try:
-                parsed = json.loads(r["content"])
-                ok = bool(parsed.get("check_result"))
-                check_ana = parsed.get("check_ana", "")
-                emit_event(
-                    "INFO",
-                    "visual_audio_assets",
-                    "log",
-                    f"{prefix}QC Result - Character: {cid}, Outfit: {oid}, Pass: {ok}, Analysis: {check_ana}",
-                    step="character_images",
-                    project=project_name,
-                )
-            except (json.JSONDecodeError, ValueError) as e:
-                emit_event(
-                    "ERROR",
-                    "visual_audio_assets",
-                    "log",
-                    f"{prefix}QC Parse Error - Character: {cid}, Outfit: {oid}, Error: {e}",
-                    step="character_images",
-                    project=project_name,
-                )
-                ok = False
-
-            if ok:
-                emit_event(
-                    "INFO",
-                    "visual_audio_assets",
-                    "qc_passed",
-                    f"QC Passed - Character: {cid}, Outfit: {oid}, Attempts: {attempts}",
-                    step="cloth_changed",
-                    project=project_name,
-                    data={"character_id": cid, "outfit_id": oid, "attempts": attempts},
-                )
-                return {"character_id": cid, "outfit_id": oid, "file": p.name, "uri": uri, "presigned": presigned, "qc_passed": True, "qc_result": r, "char_ref": char_ref, "cloth_ref": cloth_ref}
-
-            if attempts <= retry:
-                emit_event(
-                    "INFO",
-                    "visual_audio_assets",
-                    "qc_failed",
-                    f"QC Failed - Character: {cid}, Outfit: {oid}, Regenerating image",
-                    step="cloth_changed",
-                    project=project_name,
-                    data={"character_id": cid, "outfit_id": oid},
-                )
-                continue
-
-        emit_event(
-            "ERROR",
-            "visual_audio_assets",
-            "qc_failed",
-            f"QC Failed After All Retries - Character: {cid}, Outfit: {oid}, Total Attempts: {attempts}",
-            step="cloth_changed",
-            project=project_name,
-            data={"character_id": cid, "outfit_id": oid, "total_attempts": attempts},
-        )
-        if last_p:
-            return {"character_id": cid, "outfit_id": oid, "file": last_p.name, "uri": last_uri, "presigned": last_presigned, "qc_passed": False, "qc_result": last_qc_result, "char_ref": char_ref, "cloth_ref": cloth_ref}
         return None
 
     with ThreadPoolExecutor(max_workers=20) as pool:
@@ -1081,7 +986,7 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
                     continue
                 char_ref = char_map.get(cid)
                 cloth_ref = cloth_map.get(outfit_id)
-                futures.append((cid, outfit_id, pool.submit(run_async, lambda c=cid, o=outfit_id, cr=char_ref, clr=cloth_ref: process_single_image_with_qc(c, o, cr, clr))))
+                futures.append((cid, outfit_id, pool.submit(run_async, lambda c=cid, o=outfit_id, cr=char_ref, clr=cloth_ref: process_single_image(c, o, cr, clr))))
 
         for cid, outfit_id, fut in futures:
             r = fut.result()
@@ -1907,7 +1812,6 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
 
     prompt_dir = PROMPT_DIR
     char_prompt_tpl = str(prompt_dir / "character_build.txt")
-    char_qc_prompt_tpl = str(prompt_dir / "character_build_qc.txt")
     loc_prompt_tpl = str(prompt_dir / "location_build.txt")
     tts_prompt_tpl = str(prompt_dir / "jieshuo.txt")
 
@@ -2051,9 +1955,8 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
     loop = asyncio.get_running_loop()
 
     character_prompts_path: Optional[Path] = None
-    character_qc_prompts_path: Optional[Path] = None
 
-    async def run_character_prompts_workflow() -> Tuple[Path, Path]:
+    async def run_character_prompts_workflow() -> Path:
         emit_event(
             "INFO",
             "visual_audio_assets",
@@ -2090,16 +1993,6 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             project=project_name,
         )
         upload_jsonl_to_assets(tos_assets, char_prompts_path, "build_prompts")
-        tos_char_prompts_path = base_dir / "character_prompts_from_tos.jsonl"
-        # 使用项目特定的TOS前缀，支持多项目并行
-        project_prefixes = runtime_config.get_project_prefixes(project_name) if project_name else {}
-        tos_assets_prefix = project_prefixes.get("TOS_ASSETS_PREFIX", "")
-        if tos_assets_prefix:
-            tos_char_prompts_key = f"{tos_assets_prefix}/character_prompts.jsonl"
-            downloaded = _vaa_download_file_from_tos(tos_assets, runtime_config.TOS_BUCKET, tos_char_prompts_key, tos_char_prompts_path)
-        else:
-            downloaded = False
-        qc_prompts_path = tos_char_prompts_path if downloaded and tos_char_prompts_path.exists() else char_prompts_path
 
         emit_event(
             "INFO",
@@ -2109,29 +2002,28 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             step="character_prompts",
             project=project_name,
         )
-        return Path(char_prompts_path), Path(qc_prompts_path)
+        return Path(char_prompts_path)
 
-    def resolve_character_prompts_paths() -> Tuple[Path, Path]:
+    def resolve_character_prompts_path() -> Path:
         candidates = [
             base_dir / "character_prompts_from_tos.jsonl",
             base_dir / "character_prompts.jsonl",
         ]
         for path in candidates:
             if path.exists():
-                return path, path
+                return path
         raise FileNotFoundError("character_prompts.jsonl not found")
 
     async def run_character_images_workflow() -> None:
-        nonlocal character_prompts_path, character_qc_prompts_path
-        if not character_prompts_path or not character_qc_prompts_path:
-            character_prompts_path, character_qc_prompts_path = resolve_character_prompts_paths()
-        qc_prompts_path = character_qc_prompts_path
+        nonlocal character_prompts_path
+        if not character_prompts_path:
+            character_prompts_path = resolve_character_prompts_path()
 
         emit_event(
             "INFO",
             "visual_audio_assets",
             "log",
-            "Generating Character Images with Streaming QC...",
+            "Generating Character Images...",
             step="general",
             project=project_name,
         )
@@ -2148,20 +2040,6 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         project_prefixes = runtime_config.get_project_prefixes(project_name) if project_name else {}
         tos_character_prefix = project_prefixes.get("TOS_CHARACTER_PREFIX", "")
 
-        prompt_map: Dict[str, Dict[str, Any]] = {}
-        try:
-            for it in read_jsonl(str(qc_prompts_path)):
-                k = it.get("Character_Id")
-                if isinstance(k, str) and k:
-                    prompt_map[k] = it
-        except (IOError, OSError):
-            prompt_map = {}
-
-        sys_prompt = read_text(char_qc_prompt_tpl)
-        thinking = runtime_config.QC_THINKING if runtime_config.QC_THINKING != "disabled" else None
-        reasoning_effort = runtime_config.QC_REASONING_EFFORT if runtime_config.QC_REASONING_EFFORT != "disabled" else None
-
-        qc_results: List[Dict[str, Any]] = []
         total_generated_count = 0
 
         async def on_image_generated(image_path: Path, _item: Dict[str, Any], idx: int) -> None:
@@ -2169,7 +2047,6 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             total_generated_count += 1
 
             base_id = Path(image_path.name).stem
-            prompt_item = prompt_map.get(base_id)
 
             key = f"{tos_character_prefix}/{image_path.name}"
             uri = None
@@ -2203,160 +2080,6 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 },
             )
 
-            ok = False
-            attempts = 0
-            retry = 1
-            qc_result = None
-            regen_count = 0
-
-            while attempts <= retry and not ok:
-                attempts += 1
-                emit_event(
-                    "INFO",
-                    "visual_audio_assets",
-                    "log",
-                    f"QC Check - File: {image_path.name}, Attempt: {attempts}/{retry+1}",
-                    step="qc",
-                    project=project_name,
-                )
-                user_text = json.dumps(prompt_item, ensure_ascii=False) if prompt_item else None
-                tos_path = f"tos://{runtime_config.TOS_BUCKET}/{key}"
-                emit_event(
-                    "INFO",
-                    "visual_audio_assets",
-                    "log",
-                    f"QC Input - File: {image_path.name}, TOS: {tos_path}, Text: {user_text}",
-                    step="qc",
-                    project=project_name,
-                )
-
-                r = await qc_image_async(sys_prompt, presigned, user_text=user_text, thinking=thinking, reasoning_effort=reasoning_effort)
-                qc_result = r
-
-                try:
-                    content = r.get("content") if isinstance(r, dict) else None
-                    parsed = json.loads(content) if content else {}
-                    ok = bool(parsed.get("check_result"))
-                    emit_event(
-                        "INFO",
-                        "visual_audio_assets",
-                        "log",
-                        f"QC Result - File: {image_path.name}, Pass: {ok}, Content: {content[:100] if content else 'N/A'}...",
-                        step="qc",
-                        project=project_name,
-                    )
-                except (json.JSONDecodeError, ValueError) as e:
-                    emit_event(
-                        "ERROR",
-                        "visual_audio_assets",
-                        "log",
-                        f"QC Parse Error - File: {image_path.name}, Error: {e}",
-                        step="qc",
-                        project=project_name,
-                    )
-                    ok = False
-
-                if ok:
-                    emit_event(
-                        "INFO",
-                        "visual_audio_assets",
-                        "log",
-                        f"QC Passed - File: {image_path.name}, Attempts: {attempts}",
-                        step="qc",
-                        project=project_name,
-                    )
-                    qc_results.append({
-                        "file": image_path.name,
-                        "uri": uri,
-                        "presigned": presigned,
-                        "qc": r,
-                        "qc_pass": True,
-                        "qc_attempts": attempts,
-                        "qc_regen_count": regen_count
-                    })
-                    return
-
-                if not ok and attempts <= retry:
-                    prompt_item = resolve_prompt_item(image_path.name, prompt_map)
-                    prompt_text = None
-                    size_override = None
-                    if prompt_item:
-                        size_override = resolve_character_size_by_attribute(prompt_item.get("attribute"))
-                        prompt_text = prompt_item.get("st_prompt") or prompt_item.get("prompt")
-
-                    if isinstance(prompt_text, str) and prompt_text.strip():
-                        base_id = Path(image_path.name).stem
-                        emit_event(
-                            "INFO",
-                            "visual_audio_assets",
-                            "log",
-                            f"QC Failed - File: {image_path.name}, Regenerating image...",
-                            step="qc",
-                            project=project_name,
-                        )
-                        out_dir = image_path.parent
-                        new_path = await generate_and_download(prompt_text, out_dir, base_id, size=size_override)
-                        if isinstance(new_path, Path):
-                            image_path = new_path
-                            key = f"{tos_character_prefix}/{image_path.name}"
-                            if tos_assets.available():
-                                uri = tos_assets.upload_file(runtime_config.TOS_BUCKET, key, image_path)
-                            if tos_assets.available():
-                                presigned = tos_assets.presign_get(runtime_config.TOS_BUCKET, key)
-                            emit_event(
-                                "INFO",
-                                "visual_audio_assets",
-                                "log",
-                                f"Image Regenerated - File: {image_path.name}, New path: {image_path}",
-                                step="general",
-                                project=project_name,
-                            )
-                            regen_count += 1
-                            total_generated_count += 1
-                            continue
-                        emit_event(
-                            "WARN",
-                            "visual_audio_assets",
-                            "log",
-                            f"QC Regenerate Failed - File: {image_path.name}, Reason: no new image",
-                            step="qc",
-                            project=project_name,
-                        )
-                    else:
-                        emit_event(
-                            "WARN",
-                            "visual_audio_assets",
-                            "log",
-                            f"QC Regenerate Skipped - File: {image_path.name}, Reason: missing prompt text",
-                            step="qc",
-                            project=project_name,
-                        )
-
-            if not ok:
-                emit_event(
-                    "ERROR",
-                    "visual_audio_assets",
-                    "log",
-                    f"QC Failed After All Retries - File: {image_path.name}, Total Attempts: {attempts}",
-                    step="qc",
-                    project=project_name,
-                )
-                qc_results.append({
-                    "file": image_path.name,
-                    "uri": uri,
-                    "presigned": presigned,
-                    "qc": qc_result,
-                    "qc_pass": False,
-                    "qc_attempts": attempts,
-                    "qc_regen_count": regen_count
-                })
-        
-        def resolve_prompt_item(filename: str, prompt_map: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-            if not prompt_map:
-                return None
-            base_id = Path(filename).stem
-            return prompt_map.get(base_id)
-        
         image_paths = await generate_images_with_qps(
             character_prompts_path,
             name_key="Character_Id",
@@ -2368,43 +2091,10 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "INFO",
             "visual_audio_assets",
             "log",
-            f"Generated {len(image_paths)} character images.",
+            f"Generated {len(image_paths)} character images, Total Generated: {total_generated_count}",
             step="character_images",
             project=project_name,
         )
-        
-        expected_images = len(image_paths)
-        regen_total = sum(int(r.get("qc_regen_count", 0)) for r in qc_results)
-        
-        def resolve_qc_pass(result: Dict[str, Any]) -> bool:
-            qc_pass = result.get("qc_pass")
-            if isinstance(qc_pass, bool):
-                return qc_pass
-            if isinstance(qc_pass, str):
-                return qc_pass.strip().lower() == "true"
-            if qc_pass is None:
-                qc = result.get("qc")
-                if isinstance(qc, dict):
-                    content = qc.get("content")
-                    if isinstance(content, str):
-                        try:
-                            parsed = json.loads(content)
-                            return bool(parsed.get("check_result"))
-                        except (json.JSONDecodeError, ValueError):
-                            return False
-            return bool(qc_pass)
-
-        passed_total = sum(1 for r in qc_results if resolve_qc_pass(r))
-        emit_event(
-            "INFO",
-            "visual_audio_assets",
-            "log",
-            f"Character QC Completed. Expected: {expected_images}, Total Generated: {total_generated_count}, Regenerated: {regen_total}, Passed: {passed_total}",
-            step="character_images",
-            project=project_name,
-        )
-        qc_out_path = base_dir / "character_qc_results.jsonl"
-        write_jsonl(str(qc_out_path), qc_results)
 
         emit_event(
             "INFO",
@@ -2876,7 +2566,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                     data={"error": str(result)},
                 )
             elif name == "character_prompts":
-                character_prompts_path, character_qc_prompts_path = result
+                character_prompts_path = result
     if "generate_images" in phases:
         if "location_prompts" in failed_phases or "fenjing_prompts" in failed_phases:
             emit_event(
