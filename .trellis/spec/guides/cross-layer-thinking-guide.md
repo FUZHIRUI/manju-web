@@ -330,6 +330,31 @@ elif flow == "video":
 
 **规则**：每个有顺序约束的 flow 都需要 `_rollup_{flow}_steps()` 函数和 `mark_step_completed()` 中的调用。
 
+### Gotcha 3: 跨层功能移除需要全链路清理
+
+**症状**：移除某功能后，前端仍显示残留 UI，或 API 返回未定义字段。
+
+**原因**：跨层功能（如 QC 质检）通常横跨 6+ 层：Runtime（执行逻辑）→ Repo（数据读写）→ Config（配置变量）→ Service（业务调用）→ Frontend（UI 展示）→ Prompt（模板文件）。遗漏任何一层都会留下死代码或运行时错误。
+
+**实际案例**：QC 功能移除涉及 17 个文件、697 行代码，分布在：
+- 4 个 prompt 模板文件
+- Runtime 层（visual_audio_assets.py, fenjing.py, provider_runtime.py）
+- 数据层（asset_repo.py）
+- 配置层（config.py, runtime_config.py, config_defaults.py）
+- Service 层（job_service.py, asset_stats_service.py）
+- Frontend（app.js, style.css）
+
+**规则**：移除跨层功能时，按以下顺序从底向上清理：
+1. **Prompt/资源文件** — 删除模板
+2. **Runtime 层** — 删除执行逻辑（保留必要的失败重试）
+3. **API/Provider 层** — 删除外部调用函数
+4. **数据层** — 删除数据读写函数和返回字段
+5. **配置层** — 删除配置变量和默认值
+6. **Service 层** — 删除业务引用
+7. **Frontend** — 删除 UI 展示和 CSS
+8. **测试** — 清理导入和断言
+9. **验证** — `grep -ri "关键词"` 确认零残留
+
 ---
 
 ## 完整数据流示例

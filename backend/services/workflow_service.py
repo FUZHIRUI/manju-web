@@ -141,6 +141,9 @@ def run_auto_storyboard(
         "step1": "phase1",
         "step2": "phase2",
         "step3_upload": "upload",
+        "step_extract": "phase1",
+        "step_storyboard": "phase2",
+        "step_upload": "upload",
     }
     internal_phase = phase_mapping.get(phase, phase)
     
@@ -168,22 +171,18 @@ def run_auto_storyboard(
                 if phase == "full":
                     # 只有 full 才标记所有步骤为 completed
                     status_service.mark_flow_completed(project, "auto_storyboard")
-                elif phase in {"step1", "phase1"}:
-                    status_service.update_step_status(project, "auto_storyboard", "step1", "completed")
-                    status_service.update_step_status(project, "auto_storyboard", "step1_extract", "completed")
+                elif phase in {"step1", "phase1", "step_extract"}:
+                    status_service.update_step_status(project, "auto_storyboard", "step_extract", "completed")
                     flow_status = status_service.get_flow_state(project).get("flows", {}).get("auto_storyboard", {}).get("status")
                     if flow_status != "completed":
                         status_service.update_flow_status(project, "auto_storyboard", "partial_completed")
-                elif phase in {"step2", "phase2"}:
-                    # step2 只标记 step2 相关步骤为 completed，不标记 step3
-                    status_service.update_step_status(project, "auto_storyboard", "step2", "completed")
-                    status_service.update_step_status(project, "auto_storyboard", "step2_storyboard", "completed")
+                elif phase in {"step2", "phase2", "step_storyboard"}:
+                    status_service.update_step_status(project, "auto_storyboard", "step_storyboard", "completed")
                     flow_status = status_service.get_flow_state(project).get("flows", {}).get("auto_storyboard", {}).get("status")
                     if flow_status != "completed":
                         status_service.update_flow_status(project, "auto_storyboard", "partial_completed")
-                elif phase in {"step3_upload", "upload"}:
-                    status_service.update_step_status(project, "auto_storyboard", "step3_upload", "completed")
-                    status_service.update_step_status(project, "auto_storyboard", "step3_upload_assets", "completed")
+                elif phase in {"step3_upload", "upload", "step_upload"}:
+                    status_service.update_step_status(project, "auto_storyboard", "step_upload", "completed")
                 
                 job_repo.log_event("INFO", "run_auto_storyboard_success", trace_id=job["trace_id"], job_id=job_id)
                 return
@@ -191,12 +190,12 @@ def run_auto_storyboard(
                 job_repo.update_job(job_id, status="error", error=str(exc))
                 # 错误处理使用新的 step 命名
                 error_step = phase
-                if phase in {"step1", "phase1"}:
-                    error_step = "step1"
-                elif phase in {"step2", "phase2"}:
-                    error_step = "step2"
-                elif phase in {"step3_upload", "upload"}:
-                    error_step = "step3_upload"
+                if phase in {"step1", "phase1", "step_extract"}:
+                    error_step = "step_extract"
+                elif phase in {"step2", "phase2", "step_storyboard"}:
+                    error_step = "step_storyboard"
+                elif phase in {"step3_upload", "upload", "step_upload"}:
+                    error_step = "step_upload"
                 status_service.mark_flow_error(project, "auto_storyboard", [error_step])
                 job_repo.log_event("ERROR", "run_auto_storyboard_error", trace_id=job["trace_id"], job_id=job_id, error=str(exc))
     finally:
@@ -353,7 +352,7 @@ def run_fenjing(job_id: str, project: str) -> None:
                     success_count = sum(1 for item in results if item.get("status") == "success")
                     if not results or success_count == 0:
                         job_repo.update_job(job_id, status="error", error="fenjing_output_empty")
-                        status_service.mark_flow_error(project, "fenjing", ["generate_images"])
+                        status_service.mark_flow_error(project, "fenjing", ["step_generate"])
                         job_repo.log_event(
                             "ERROR",
                             "fenjing_output_empty",
@@ -371,7 +370,7 @@ def run_fenjing(job_id: str, project: str) -> None:
                         partial_failed_types=summary.get("partial_failed_types", []),
                     )
                     if summary.get("partial_failed"):
-                        status_service.update_step_partial(project, "fenjing", "generate_images")
+                        status_service.update_step_partial(project, "fenjing", "step_generate")
                         status_service.mark_flow_partial(project, "fenjing")
                     else:
                         status_service.mark_flow_completed(project, "fenjing")
@@ -425,7 +424,7 @@ def run_fenjing_generate(job_id: str, project: str) -> None:
                     success_count = sum(1 for item in results if item.get("status") == "success")
                     if not results or success_count == 0:
                         job_repo.update_job(job_id, status="error", error="fenjing_generate_output_empty")
-                        status_service.mark_flow_error(project, "fenjing_generate", ["generate_images"])
+                        status_service.mark_flow_error(project, "fenjing_generate", ["step_generate"])
                         job_repo.log_event(
                             "ERROR",
                             "fenjing_generate_output_empty",
@@ -443,13 +442,13 @@ def run_fenjing_generate(job_id: str, project: str) -> None:
                         partial_failed_types=summary.get("partial_failed_types", []),
                     )
                     if summary.get("partial_failed"):
-                        status_service.update_step_partial(project, "fenjing_generate", "generate_images")
+                        status_service.update_step_partial(project, "fenjing_generate", "step_generate")
                         status_service.mark_flow_partial(project, "fenjing_generate")
                     else:
                         status_service.mark_flow_completed(project, "fenjing_generate")
                 except Exception as exc:
                     job_repo.update_job(job_id, status="error", error=str(exc))
-                    status_service.mark_flow_error(project, "fenjing_generate", ["generate_images"])
+                    status_service.mark_flow_error(project, "fenjing_generate", ["step_generate"])
                     job_repo.log_event(
                         "ERROR",
                         "asset_results_build_error",
@@ -470,7 +469,7 @@ def run_fenjing_generate(job_id: str, project: str) -> None:
                 sys.__stderr__.write(f"\n=====================\n")
                 sys.__stderr__.flush()
                 job_repo.update_job(job_id, status="error", error=str(exc))
-                status_service.mark_flow_error(project, "fenjing_generate", ["generate_images"])
+                status_service.mark_flow_error(project, "fenjing_generate", ["step_generate"])
                 job_repo.log_event("ERROR", "run_fenjing_generate_error", trace_id=job["trace_id"], job_id=job_id, error=str(exc))
     finally:
         if stage_limiter:
@@ -501,7 +500,7 @@ def run_fenjing_upload(job_id: str, project: str) -> None:
                 sys.__stderr__.write(f"\n=====================\n")
                 sys.__stderr__.flush()
                 job_repo.update_job(job_id, status="error", error=str(exc))
-                status_service.mark_flow_error(project, "fenjing_upload", ["upload_fenjing_images"])
+                status_service.mark_flow_error(project, "fenjing_upload", ["step_upload"])
                 job_repo.log_event("ERROR", "run_fenjing_upload_error", trace_id=job["trace_id"], job_id=job_id, error=str(exc))
     finally:
         if stage_limiter:
@@ -525,10 +524,10 @@ def run_video(job_id: str, project: str, phase: str = "all") -> None:
                     result_entries = asyncio.run(call_with_project(video.run_video_prepare_prompts, local_out, project_name=project))
                     if not result_entries:
                         job_repo.update_job(job_id, status="error", error="prepare_prompts_empty")
-                        status_service.mark_flow_error(project, "video", ["prepare", "phase1_video_prompts"])
+                        status_service.mark_flow_error(project, "video", ["step_prepare", "step_video_prompts"])
                         return
-                    status_service.mark_step_completed(project, "video", "prepare")
-                    status_service.mark_step_completed(project, "video", "phase1_video_prompts")
+                    status_service.mark_step_completed(project, "video", "step_prepare")
+                    status_service.mark_step_completed(project, "video", "step_video_prompts")
                     job_repo.update_job(job_id, status="success")
                     job_repo.log_event("INFO", "run_video_success", trace_id=job["trace_id"], job_id=job_id, phase=phase)
                     return
@@ -544,10 +543,10 @@ def run_video(job_id: str, project: str, phase: str = "all") -> None:
                         summary = {}
                     if success_count == 0:
                         job_repo.update_job(job_id, status="error", error="generate_videos_all_failed")
-                        status_service.mark_flow_error(project, "video", ["phase2_video_generation"])
+                        status_service.mark_flow_error(project, "video", ["step_video_generation"])
                         return
                     if error_count > 0:
-                        status_service.update_step_partial(project, "video", "phase2_video_generation")
+                        status_service.update_step_partial(project, "video", "step_video_generation")
                         job_repo.update_job(
                             job_id, status="success",
                             partial_failed=True,
@@ -555,7 +554,7 @@ def run_video(job_id: str, project: str, phase: str = "all") -> None:
                             partial_failed_types=summary.get("partial_failed_types", []),
                         )
                     else:
-                        status_service.mark_step_completed(project, "video", "phase2_video_generation")
+                        status_service.mark_step_completed(project, "video", "step_video_generation")
                         job_repo.update_job(job_id, status="success")
                     job_repo.log_event("INFO", "run_video_success", trace_id=job["trace_id"], job_id=job_id, phase=phase)
                     return
@@ -564,9 +563,9 @@ def run_video(job_id: str, project: str, phase: str = "all") -> None:
                     success_count, error_count = asyncio.run(call_with_project(video.run_video_upload_only, local_out, project_name=project))
                     if success_count == 0:
                         job_repo.update_job(job_id, status="error", error="upload_videos_all_failed")
-                        status_service.mark_flow_error(project, "video", ["fenjing_video_upload"])
+                        status_service.mark_flow_error(project, "video", ["step_video_upload"])
                         return
-                    status_service.mark_step_completed(project, "video", "fenjing_video_upload")
+                    status_service.mark_step_completed(project, "video", "step_video_upload")
                     job_repo.update_job(job_id, status="success")
                     job_repo.log_event("INFO", "run_video_success", trace_id=job["trace_id"], job_id=job_id, phase=phase)
                     return
@@ -586,13 +585,13 @@ def run_video(job_id: str, project: str, phase: str = "all") -> None:
                             partial_failed_types=summary.get("partial_failed_types", []),
                         )
                         if summary.get("partial_failed"):
-                            status_service.update_step_partial(project, "video", "phase2_video_generation")
+                            status_service.update_step_partial(project, "video", "step_video_generation")
                             status_service.mark_flow_partial(project, "video")
                         else:
                             status_service.mark_flow_completed(project, "video")
                     except Exception as exc:
                         job_repo.update_job(job_id, status="error", error=str(exc))
-                        status_service.mark_flow_error(project, "video", ["phase2_video_generation"])
+                        status_service.mark_flow_error(project, "video", ["step_video_generation"])
                         job_repo.log_event(
                             "ERROR", "asset_results_build_error",
                             trace_id=job["trace_id"], job_id=job_id,
@@ -603,10 +602,10 @@ def run_video(job_id: str, project: str, phase: str = "all") -> None:
             except Exception as exc:
                 job_repo.update_job(job_id, status="error", error=str(exc))
                 step_list = {
-                    "prepare_prompts": ["prepare", "phase1_video_prompts"],
-                    "generate_videos": ["phase2_video_generation"],
-                    "upload_videos": ["fenjing_video_upload"],
-                }.get(phase, ["phase2_video_generation"])
+                    "prepare_prompts": ["step_prepare", "step_video_prompts"],
+                    "generate_videos": ["step_video_generation"],
+                    "upload_videos": ["step_video_upload"],
+                }.get(phase, ["step_video_generation"])
                 status_service.mark_flow_error(project, "video", step_list)
                 job_repo.log_event("ERROR", "run_video_error", trace_id=job["trace_id"], job_id=job_id, error=str(exc))
     finally:

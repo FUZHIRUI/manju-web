@@ -110,31 +110,31 @@ def _parse_non_negative_int(value: object) -> Optional[int]:
 def _resolve_flow_steps(workflow: str, phase: Optional[str]) -> list:
     if workflow == "auto_storyboard":
         token = str(phase or "").strip().lower()
-        if token in ["step2", "phase2"]:
-            return ["step2"]
-        elif token in ["step1", "phase1"]:
-            return ["step1"]
-        elif token in ["step3_upload", "upload"]:
-            return ["step3_upload"]
-        return ["step1"]
+        if token in ["step2", "phase2", "step_storyboard"]:
+            return ["step_storyboard"]
+        elif token in ["step1", "phase1", "step_extract"]:
+            return ["step_extract"]
+        elif token in ["step3_upload", "upload", "step_upload"]:
+            return ["step_upload"]
+        return ["step_extract"]
     if workflow == "visual_audio_assets":
         return status_service.resolve_visual_audio_steps(str(phase or "all"))
     if workflow == "fenjing":
-        return ["download_assets"]
+        return ["step_download"]
     if workflow == "fenjing_generate":
-        return ["download_assets"]
+        return ["step_download"]
     if workflow == "fenjing_upload":
-        return ["upload_fenjing_images"]
+        return ["step_upload"]
     if workflow == "video":
         token = str(phase or "").strip().lower()
         if token == "prepare_prompts":
-            return ["prepare", "phase1_video_prompts"]
+            return ["step_prepare", "step_video_prompts"]
         elif token == "generate_videos":
-            return ["phase2_video_generation"]
+            return ["step_video_generation"]
         elif token == "upload_videos":
-            return ["fenjing_video_upload"]
+            return ["step_video_upload"]
         else:
-            return ["prepare", "phase1_video_prompts", "phase2_video_generation", "fenjing_video_upload"]
+            return ["step_prepare", "step_video_prompts", "step_video_generation", "step_video_upload"]
     return []
 
 
@@ -177,7 +177,7 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
                 return True
             phase = str(raw_phase).strip().lower()
             # 支持新的 step 命名和旧的 phase 命名
-            if phase not in {"phase1", "phase2", "full", "step1", "step2", "step3_upload"}:
+            if phase not in {"phase1", "phase2", "full", "step1", "step2", "step3_upload", "step_extract", "step_storyboard", "step_upload"}:
                 send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "invalid_phase"})
                 return True
             chapter_size = _parse_int(body.get("chapter_size"))
@@ -285,7 +285,7 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
             # 当只运行特定phase时，只重置当前phase的步骤，保留其他phase的状态
             token = str(phase_value or "").strip().lower()
             # 支持新的 step 命名和旧的 phase 命名
-            if token in {"phase1", "phase2", "step1", "step2", "step3_upload"}:
+            if token in {"phase1", "phase2", "step1", "step2", "step3_upload", "step_extract", "step_storyboard", "step_upload"}:
                 reset_steps = False
                 status_service.reset_flow_steps(project, workflow, steps)
         elif workflow == "fenjing":

@@ -86,13 +86,13 @@ class TestStatusConstants:
         
         partial_steps = status_service._PARTIAL_STEPS
         assert "visual_audio_assets" in partial_steps
-        assert "fenjing" in partial_steps
+        assert "fenjing_generate" in partial_steps
         assert "video" in partial_steps
-        
+
         va_partial = partial_steps["visual_audio_assets"]
-        assert "character_images" in va_partial, "character_images 应在 partial_steps 中"
-        assert "location_images" in va_partial, "location_images 应在 partial_steps 中"
-        assert "tts" in va_partial, "tts 应在 partial_steps 中"
+        assert "step_character_images" in va_partial, "step_character_images 应在 partial_steps 中"
+        assert "step_location_images" in va_partial, "step_location_images 应在 partial_steps 中"
+        assert "step_tts" in va_partial, "step_tts 应在 partial_steps 中"
         print("[PASS] _PARTIAL_STEPS 配置正确")
 
 
@@ -105,7 +105,7 @@ class TestNormalizeStateOnStartup:
         
         state = status_service._default_flow_state(PROJECT)
         state["flows"]["visual_audio_assets"]["status"] = "running"
-        state["flows"]["visual_audio_assets"]["steps"]["character_prompts"] = "running"
+        state["flows"]["visual_audio_assets"]["steps"]["step_character_prompts"] = "running"
         status_repo.write_flow_state(PROJECT, state)
         
         status_service.normalize_state_on_startup(PROJECT)
@@ -116,7 +116,7 @@ class TestNormalizeStateOnStartup:
         assert va_flow.get("status") == "error", f"大阶段状态应为 error，实际为 {va_flow.get('status')}"
         
         steps = va_flow.get("steps", {})
-        assert steps.get("character_prompts") == "error", f"小阶段状态应为 error，实际为 {steps.get('character_prompts')}"
+        assert steps.get("step_character_prompts") == "error", f"小阶段状态应为 error，实际为 {steps.get('step_character_prompts')}"
         print("[PASS] running 状态正确转换为 error")
     
     def test_normalize_partial_returned_to_partial_completed(self):
@@ -125,7 +125,7 @@ class TestNormalizeStateOnStartup:
         from backend.repositories import status_repo
         
         state = status_service._default_flow_state(PROJECT)
-        state["flows"]["visual_audio_assets"]["steps"]["character_images"] = "partial_returned"
+        state["flows"]["visual_audio_assets"]["steps"]["step_character_images"] = "partial_returned"
         status_repo.write_flow_state(PROJECT, state)
         
         status_service.normalize_state_on_startup(PROJECT)
@@ -134,7 +134,7 @@ class TestNormalizeStateOnStartup:
         va_flow = result.get("flows", {}).get("visual_audio_assets", {})
         steps = va_flow.get("steps", {})
         
-        assert steps.get("character_images") == "partial_completed", f"状态应为 partial_completed，实际为 {steps.get('character_images')}"
+        assert steps.get("step_character_images") == "partial_completed", f"状态应为 partial_completed，实际为 {steps.get('step_character_images')}"
         print("[PASS] partial_returned 正确转换为 partial_completed")
 
 
