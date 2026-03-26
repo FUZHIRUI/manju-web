@@ -97,7 +97,7 @@ async def generate_images_with_qps(
                     "visual_audio_assets",
                     "generate_progress",
                     f"Generating Image - {name_prefix}, Progress: {idx+1}/{len(prompts)}",
-                    step="generate_images",
+                    step="step_character_images",
                     project=project_name,
                     data={"name_prefix": name_prefix, "progress": idx+1, "total": len(prompts)},
                 )
@@ -133,7 +133,7 @@ def _vaa_download_file_from_tos(tos: TosClientWrapper, bucket: str, key: str, lo
             "visual_audio_assets",
             "download_failed",
             f"Failed to download {key}: {e}",
-            step="download_assets",
+            step="step_download",
             project=project_name,
             data={"key": key, "error": str(e)},
         )
@@ -151,7 +151,7 @@ def download_assets_from_tos(local_base_dir: Path, project_name: Optional[str] =
             "visual_audio_assets",
             "download_skipped",
             "TOS client not available, cannot download assets",
-            step="download_assets",
+            step="step_download",
             project=current_proj_name,
         )
         return False
@@ -165,7 +165,7 @@ def download_assets_from_tos(local_base_dir: Path, project_name: Optional[str] =
         "visual_audio_assets",
         "download_start",
         f"Checking and downloading assets from TOS: {runtime_config.TOS_BUCKET}/{tos_assets_prefix}",
-        step="download_assets",
+        step="step_download",
         project=current_proj_name,
         data={"bucket": runtime_config.TOS_BUCKET, "prefix": tos_assets_prefix},
     )
@@ -186,7 +186,7 @@ def download_assets_from_tos(local_base_dir: Path, project_name: Optional[str] =
                 "visual_audio_assets",
                 "download_progress",
                 f"Downloading {fname} from TOS",
-                step="download_assets",
+                step="step_download",
                 project=current_proj_name,
                 data={"file": fname},
             )
@@ -196,7 +196,7 @@ def download_assets_from_tos(local_base_dir: Path, project_name: Optional[str] =
                     "visual_audio_assets",
                     "download_progress",
                     f"Downloaded {fname}",
-                    step="download_assets",
+                    step="step_download",
                     project=current_proj_name,
                     data={"file": fname, "ok": True},
                 )
@@ -207,7 +207,7 @@ def download_assets_from_tos(local_base_dir: Path, project_name: Optional[str] =
                     "visual_audio_assets",
                     "download_failed",
                     f"Failed to download {fname}",
-                    step="download_assets",
+                    step="step_download",
                     project=current_proj_name,
                     data={"file": fname, "ok": False},
                 )
@@ -219,7 +219,7 @@ def download_assets_from_tos(local_base_dir: Path, project_name: Optional[str] =
                 "visual_audio_assets",
                 "download_skipped",
                 f"{fname} already exists locally, skipping download",
-                step="download_assets",
+                step="step_download",
                 project=current_proj_name,
                 data={"file": fname},
             )
@@ -257,7 +257,7 @@ def extract_and_fix_fenjing_prompts(content: str, expected_count: int, project_n
         "visual_audio_assets",
         "parse_debug",
         f"AI returned content (first 500 chars): {content[:500]}",
-        step="fenjing_prompts",
+        step="step_fenjing_prompts",
         project=project_name,
         data={"content_preview": content[:500]},
     )
@@ -267,7 +267,7 @@ def extract_and_fix_fenjing_prompts(content: str, expected_count: int, project_n
         "visual_audio_assets",
         "parse_debug",
         f"Parsed {len(prompts)} prompts from AI response",
-        step="fenjing_prompts",
+        step="step_fenjing_prompts",
         project=project_name,
         data={"parsed_count": len(prompts)},
     )
@@ -278,7 +278,7 @@ def extract_and_fix_fenjing_prompts(content: str, expected_count: int, project_n
             "visual_audio_assets",
             "log",
             f"No prompts found in AI response, will retry",
-            step="general",
+            step="step_fenjing_prompts",
             project=project_name,
         )
         return []
@@ -289,7 +289,7 @@ def extract_and_fix_fenjing_prompts(content: str, expected_count: int, project_n
             "visual_audio_assets",
             "log",
             f"Prompt count mismatch: expected {expected_count}, got {len(prompts)}, will retry",
-            step="general",
+            step="step_fenjing_prompts",
             project=project_name,
         )
         return []
@@ -303,7 +303,7 @@ def extract_and_fix_fenjing_prompts(content: str, expected_count: int, project_n
                 "visual_audio_assets",
                 "parse_warning",
                 f"Prompt at index {idx} is not a dict, will retry",
-                step="fenjing_prompts",
+                step="step_fenjing_prompts",
                 project=project_name,
                 data={"index": idx},
             )
@@ -315,7 +315,7 @@ def extract_and_fix_fenjing_prompts(content: str, expected_count: int, project_n
                 "visual_audio_assets",
                 "parse_warning",
                 f"Prompt at index {idx} missing 'prompt' field, will retry",
-                step="fenjing_prompts",
+                step="step_fenjing_prompts",
                 project=project_name,
                 data={"index": idx},
             )
@@ -327,7 +327,7 @@ def extract_and_fix_fenjing_prompts(content: str, expected_count: int, project_n
                 "visual_audio_assets",
                 "parse_warning",
                 f"Prompt at index {idx} missing 'fenjing_id' field, will retry",
-                step="fenjing_prompts",
+                step="step_fenjing_prompts",
                 project=project_name,
                 data={"index": idx},
             )
@@ -340,7 +340,7 @@ def extract_and_fix_fenjing_prompts(content: str, expected_count: int, project_n
         "visual_audio_assets",
         "parse_complete",
         f"All {len(valid_prompts)} prompts are valid",
-        step="fenjing_prompts",
+        step="step_fenjing_prompts",
         project=project_name,
         data={"valid_count": len(valid_prompts)},
     )
@@ -418,7 +418,7 @@ async def generate_location_images_shared(
                 "visual_audio_assets",
                 "upload_progress",
                 "location image upload skipped: missing TOS prefix",
-                step="location_images",
+                step="step_location_images",
                 project=project_name,
                 data={"image_type": "location", "image_id": loc_id, "bg_type": bg_type, "ok": False, "reason": "missing_prefix"},
             )
@@ -431,7 +431,7 @@ async def generate_location_images_shared(
             "visual_audio_assets",
             "upload_progress",
             f"location image uploaded: {p.name}",
-            step="location_images",
+            step="step_location_images",
             project=project_name,
             data={
                 "file": p.name,
@@ -453,7 +453,7 @@ async def generate_location_images_shared(
                 "visual_audio_assets",
                 "upload_progress",
                 "location image skipped: empty prompt",
-                step="location_images",
+                step="step_location_images",
                 project=project_name,
                 data={"image_type": "location", "image_id": loc_id, "bg_type": bg_type, "ok": False, "reason": "empty_prompt"},
             )
@@ -467,7 +467,7 @@ async def generate_location_images_shared(
                     "visual_audio_assets",
                     "upload_progress",
                     "location image generation failed",
-                    step="location_images",
+                    step="step_location_images",
                     project=project_name,
                     data={"image_type": "location", "image_id": loc_id, "bg_type": bg_type, "ok": False},
                 )
@@ -498,7 +498,7 @@ async def generate_location_images_shared(
                     "visual_audio_assets",
                     "upload_progress",
                     "location image skipped: missing prompt",
-                    step="location_images",
+                    step="step_location_images",
                     project=project_name,
                     data={"image_type": "location", "image_id": loc_id, "bg_type": bg_type, "ok": False, "reason": "missing_prompt"},
                 )
@@ -515,7 +515,7 @@ async def generate_location_images_shared(
                 "visual_audio_assets",
                 "flow_error",
                 f"location image task failed: {r}",
-                step="location_images",
+                step="step_location_images",
                 project=project_name,
             )
     return results
@@ -538,7 +538,7 @@ def build_fenjing_prompts_with_retry(
             "visual_audio_assets",
             "build_progress",
             f"Building Fenjing Prompts (Attempt {attempt + 1}/{max_retries + 1}) - {storyboards_jsonl_path.name}",
-            step="fenjing_prompts",
+            step="step_fenjing_prompts",
             project=project_name,
             data={"attempt": attempt + 1, "max_retries": max_retries + 1, "file": storyboards_jsonl_path.name},
         )
@@ -553,7 +553,7 @@ def build_fenjing_prompts_with_retry(
                 "visual_audio_assets",
                 "api_complete",
                 f"Fenjing prompt call done - elapsed={elapsed:.2f}s, chapter={storyboards_jsonl_path.name}",
-                step="fenjing_prompts",
+                step="step_fenjing_prompts",
                 project=project_name,
                 data={"elapsed": elapsed, "file": storyboards_jsonl_path.name},
             )
@@ -566,7 +566,7 @@ def build_fenjing_prompts_with_retry(
                     "visual_audio_assets",
                     "parse_warning",
                     "No valid prompts found after extraction and fixing",
-                    step="fenjing_prompts",
+                    step="step_fenjing_prompts",
                     project=project_name,
                 )
                 if attempt < max_retries:
@@ -576,7 +576,7 @@ def build_fenjing_prompts_with_retry(
                     "visual_audio_assets",
                     "flow_error",
                     f"Fenjing prompts 重试超限: {storyboards_jsonl_path.name}",
-                    step="fenjing_prompts",
+                    step="step_fenjing_prompts",
                     project=project_name,
                     data={"file": storyboards_jsonl_path.name, "attempt": attempt + 1, "max_retries": max_retries + 1},
                 )
@@ -588,7 +588,7 @@ def build_fenjing_prompts_with_retry(
                     "visual_audio_assets",
                     "parse_warning",
                     f"Prompt count mismatch: expected {expected_count}, got {len(valid_prompts)}",
-                    step="fenjing_prompts",
+                    step="step_fenjing_prompts",
                     project=project_name,
                     data={"expected": expected_count, "actual": len(valid_prompts)},
                 )
@@ -598,7 +598,7 @@ def build_fenjing_prompts_with_retry(
                         "visual_audio_assets",
                         "retry",
                         "Retrying to get correct count",
-                        step="fenjing_prompts",
+                        step="step_fenjing_prompts",
                         project=project_name,
                     )
                     continue
@@ -607,7 +607,7 @@ def build_fenjing_prompts_with_retry(
                     "visual_audio_assets",
                     "flow_error",
                     f"Fenjing prompts 数量不匹配且重试超限: {storyboards_jsonl_path.name}",
-                    step="fenjing_prompts",
+                    step="step_fenjing_prompts",
                     project=project_name,
                     data={
                         "file": storyboards_jsonl_path.name,
@@ -624,7 +624,7 @@ def build_fenjing_prompts_with_retry(
                 "visual_audio_assets",
                 "log",
                 f"Fenjing Prompts saved to: {output_path}, count: {len(valid_prompts)}",
-                step="fenjing_prompts",
+                step="step_fenjing_prompts",
                 project=project_name,
             )
             return output_path
@@ -634,7 +634,7 @@ def build_fenjing_prompts_with_retry(
                 "visual_audio_assets",
                 "log",
                 f"Failed to build fenjing prompts: {e}",
-                step="fenjing_prompts",
+                step="step_fenjing_prompts",
                 project=project_name,
             )
             if attempt < max_retries:
@@ -645,7 +645,7 @@ def build_fenjing_prompts_with_retry(
                     "visual_audio_assets",
                     "flow_error",
                     f"Fenjing prompts 构建失败且重试超限: {storyboards_jsonl_path.name}",
-                    step="fenjing_prompts",
+                    step="step_fenjing_prompts",
                     project=project_name,
                     data={"file": storyboards_jsonl_path.name, "attempt": attempt + 1, "max_retries": max_retries + 1, "error": str(e)},
                 )
@@ -818,7 +818,7 @@ def generate_cloth_images(chars_jsonl_path: Path, base_dir: Path, prefix: str = 
                     "visual_audio_assets",
                     "upload_progress",
                     f"cloth image uploaded: {p.name}",
-                    step="cloth_images",
+                    step="step_cloth_images",
                     project=project_name,
                     data={
                         "file": p.name,
@@ -836,7 +836,7 @@ def generate_cloth_images(chars_jsonl_path: Path, base_dir: Path, prefix: str = 
                     "visual_audio_assets",
                     "upload_progress",
                     f"cloth image generation failed: {outfit_id}",
-                    step="generate_cloth",
+                    step="step_cloth_images",
                     project=project_name,
                     data={
                         "image_type": "cloth",
@@ -849,7 +849,7 @@ def generate_cloth_images(chars_jsonl_path: Path, base_dir: Path, prefix: str = 
         "visual_audio_assets",
         "log",
         f"{prefix}generate_cloth_images: generated {len(results)} cloth images",
-        step="cloth_images",
+        step="step_cloth_images",
         project=project_name,
     )
     return results
@@ -888,7 +888,7 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
                 "visual_audio_assets",
                 "log",
                 f"{prefix}Generating Cloth Changed Image - Character: {cid}, Outfit: {oid}, Attempt: {attempts}/{retry+1}",
-                step="character_images",
+                step="step_cloth_changed",
                 project=project_name,
             )
 
@@ -902,7 +902,7 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
                 "visual_audio_assets",
                 "refs_used",
                 f"{prefix}Using refs for cloth_changed: {cid}_{oid}, char_ref={'Y' if char_ref else 'N'}, cloth_ref={'Y' if cloth_ref else 'N'}",
-                step="cloth_changed",
+                step="step_cloth_changed",
                 project=project_name,
                 data={
                     "character_id": cid,
@@ -932,7 +932,7 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
                     "visual_audio_assets",
                     "log",
                     f"{prefix}Generation Failed - Character: {cid}, Outfit: {oid}, Attempt: {attempts}",
-                    step="character_images",
+                    step="step_cloth_changed",
                     project=project_name,
                 )
                 if attempts <= retry:
@@ -948,7 +948,7 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
                 "visual_audio_assets",
                 "upload_progress",
                 f"cloth changed image uploaded: {p.name}",
-                step="cloth_changed",
+                step="step_cloth_changed",
                 project=project_name,
                 data={
                     "file": p.name,
@@ -998,7 +998,7 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
                     "visual_audio_assets",
                     "upload_progress",
                     f"cloth changed image generation failed: {cid}_{outfit_id}",
-                    step="generate_cloth",
+                    step="step_cloth_changed",
                     project=project_name,
                     data={
                         "image_type": "cloth_changed",
@@ -1014,7 +1014,7 @@ def generate_cloth_changed_images(chars_jsonl_path: Path, cloth_upload: List[Dic
         "visual_audio_assets",
         "log",
         f"{prefix}generate_cloth_changed_images: generated {len(results)} cloth changed images",
-        step="cloth_images",
+        step="step_cloth_changed",
         project=project_name,
     )
     return results
@@ -1147,7 +1147,7 @@ def upload_jsonl_to_assets(tos: TosClientWrapper, jsonl_path: Path, step_id: str
             "visual_audio_assets",
             "log",
             "TOS client not available, cannot upload assets.",
-            step="general",
+            step="step_upload",
             project=project_name,
         )
         return False
@@ -1173,7 +1173,7 @@ def upload_jsonl_to_assets(tos: TosClientWrapper, jsonl_path: Path, step_id: str
                 "visual_audio_assets",
                 "log",
                 f"Uploaded {jsonl_path.name} to {key}",
-                step="upload_assets",
+                step="step_upload",
                 project=project_name,
             )
             return True
@@ -1191,7 +1191,7 @@ def upload_jsonl_to_assets(tos: TosClientWrapper, jsonl_path: Path, step_id: str
             "visual_audio_assets",
             "log",
             f"Failed to upload {jsonl_path.name} to {key}",
-            step="upload_assets",
+            step="step_upload",
             project=project_name,
         )
         return False
@@ -1210,7 +1210,7 @@ def upload_jsonl_to_assets(tos: TosClientWrapper, jsonl_path: Path, step_id: str
             "visual_audio_assets",
             "log",
             f"Failed to upload {jsonl_path.name}: {e}",
-            step="upload_assets",
+            step="step_upload",
             project=project_name,
         )
         return False
@@ -1245,7 +1245,7 @@ def validate_and_fix_character_ids(
                 "visual_audio_assets",
                 "log",
                 f"Prompt missing Character_Id or name: {prompt}",
-                step="character_images",
+                step="step_character_images",
                 project=project_name,
             )
             fixed_prompts.append(prompt)
@@ -1261,7 +1261,7 @@ def validate_and_fix_character_ids(
                     "visual_audio_assets",
                     "log",
                     f"Character_Id '{prompt_id}' matched but name mismatch: '{prompt_name}' vs '{ref_id_map[prompt_id]}'",
-                    step="character_images",
+                    step="step_character_images",
                     project=project_name,
                 )
                 prompt["name"] = ref_id_map[prompt_id]
@@ -1276,7 +1276,7 @@ def validate_and_fix_character_ids(
                     "visual_audio_assets",
                     "log",
                     f"Mapping Character_Id by name: '{prompt_name}' -> '{correct_id}' (was '{prompt_id}')",
-                    step="character_images",
+                    step="step_character_images",
                     project=project_name,
                 )
                 prompt["Character_Id"] = correct_id
@@ -1287,7 +1287,7 @@ def validate_and_fix_character_ids(
                     "visual_audio_assets",
                     "log",
                     f"Cannot map Character_Id for '{prompt_name}', keeping original ID: '{prompt_id}'",
-                    step="character_images",
+                    step="step_character_images",
                     project=project_name,
                 )
             fixed_prompts.append(prompt)
@@ -1320,7 +1320,7 @@ def validate_and_fix_location_ids(
                 "visual_audio_assets",
                 "log",
                 f"Prompt missing Location or name: {prompt}",
-                step="location_images",
+                step="step_location_images",
                 project=project_name,
             )
             fixed_prompts.append(prompt)
@@ -1358,7 +1358,7 @@ def build_character_prompts_with_retry(
             "visual_audio_assets",
             "build_progress",
             f"Building Character Prompts (Attempt {attempt + 1}/{max_retries + 1})",
-            step="character_prompts",
+            step="step_character_prompts",
             project=project_name,
             data={"attempt": attempt + 1, "max_retries": max_retries + 1},
         )
@@ -1377,7 +1377,7 @@ def build_character_prompts_with_retry(
                     "visual_audio_assets",
                     "parse_warning",
                     f"Invalid format: expected non-empty list, got {type(prompts).__name__}",
-                    step="character_prompts",
+                    step="step_character_prompts",
                     project=project_name,
                     data={"type": type(prompts).__name__},
                 )
@@ -1387,7 +1387,7 @@ def build_character_prompts_with_retry(
                         "visual_audio_assets",
                         "retry",
                         "Retrying",
-                        step="character_prompts",
+                        step="step_character_prompts",
                         project=project_name,
                     )
                     continue
@@ -1405,7 +1405,7 @@ def build_character_prompts_with_retry(
                         "visual_audio_assets",
                         "parse_warning",
                         f"Skipping invalid prompt entry: {p}",
-                        step="character_prompts",
+                        step="step_character_prompts",
                         project=project_name,
                         data={"entry": str(p)},
                     )
@@ -1416,7 +1416,7 @@ def build_character_prompts_with_retry(
                     "visual_audio_assets",
                     "parse_warning",
                     "No valid prompts found",
-                    step="character_prompts",
+                    step="step_character_prompts",
                     project=project_name,
                 )
                 if attempt < max_retries:
@@ -1425,7 +1425,7 @@ def build_character_prompts_with_retry(
                         "visual_audio_assets",
                         "retry",
                         "Retrying",
-                        step="character_prompts",
+                        step="step_character_prompts",
                         project=project_name,
                     )
                     continue
@@ -1437,7 +1437,7 @@ def build_character_prompts_with_retry(
                 "visual_audio_assets",
                 "log",
                 f"Character ID Validation: total={stats['total']}, matched={stats['matched']}, fixed={stats['fixed']}, mismatched={stats['mismatched']}",
-                step="character_images",
+                step="step_character_images",
                 project=project_name,
             )
 
@@ -1447,7 +1447,7 @@ def build_character_prompts_with_retry(
                 "visual_audio_assets",
                 "log",
                 f"Character Prompts saved to: {output_path}",
-                step="character_images",
+                step="step_character_images",
                 project=project_name,
             )
             return output_path
@@ -1458,7 +1458,7 @@ def build_character_prompts_with_retry(
                 "visual_audio_assets",
                 "log",
                 f"Failed to build character prompts: {e}",
-                step="character_images",
+                step="step_character_images",
                 project=project_name,
             )
             if attempt < max_retries:
@@ -1467,7 +1467,7 @@ def build_character_prompts_with_retry(
                     "visual_audio_assets",
                     "log",
                     "Retrying...",
-                    step="general",
+                    step="step_character_prompts",
                     project=project_name,
                 )
                 time.sleep(2)
@@ -1513,7 +1513,7 @@ def build_tts_prompts_for_chapter(chapter_jsonl_path: Path, prompt_path: str, pr
             "visual_audio_assets",
             "log",
             f"TTS Prompt JSON Parse Error: {e}",
-            step="tts",
+            step="step_tts",
             project=project_name,
         )
         try:
@@ -1545,7 +1545,7 @@ def build_location_prompts_with_retry(
             "visual_audio_assets",
             "log",
             f"Building Location Prompts (Attempt {attempt + 1}/{max_retries + 1})...",
-            step="location_images",
+            step="step_location_images",
             project=project_name,
         )
         try:
@@ -1566,7 +1566,7 @@ def build_location_prompts_with_retry(
                     "visual_audio_assets",
                     "log",
                     f"Invalid format: expected non-empty list, got {type(prompts).__name__}",
-                    step="general",
+                    step="step_location_prompts",
                     project=project_name,
                 )
                 if attempt < max_retries:
@@ -1575,7 +1575,7 @@ def build_location_prompts_with_retry(
                         "visual_audio_assets",
                         "log",
                         "Retrying...",
-                        step="general",
+                        step="step_location_prompts",
                         project=project_name,
                     )
                     continue
@@ -1584,7 +1584,7 @@ def build_location_prompts_with_retry(
                     "visual_audio_assets",
                     "flow_error",
                     "Location prompts 重试超限，格式无效",
-                    step="location_prompts",
+                    step="step_location_prompts",
                     project=project_name,
                     data={"attempt": attempt + 1, "max_retries": max_retries + 1},
                 )
@@ -1604,7 +1604,7 @@ def build_location_prompts_with_retry(
                         "visual_audio_assets",
                         "parse_warning",
                         f"Skipping invalid prompt entry: {p}",
-                        step="location_prompts",
+                        step="step_location_prompts",
                         project=project_name,
                         data={"entry": str(p)},
                     )
@@ -1615,7 +1615,7 @@ def build_location_prompts_with_retry(
                     "visual_audio_assets",
                     "log",
                     "No valid prompts found",
-                    step="general",
+                    step="step_location_prompts",
                     project=project_name,
                 )
                 if attempt < max_retries:
@@ -1624,7 +1624,7 @@ def build_location_prompts_with_retry(
                         "visual_audio_assets",
                         "log",
                         "Retrying...",
-                        step="general",
+                        step="step_location_prompts",
                         project=project_name,
                     )
                     continue
@@ -1633,7 +1633,7 @@ def build_location_prompts_with_retry(
                     "visual_audio_assets",
                     "flow_error",
                     "Location prompts 重试超限，无有效条目",
-                    step="location_prompts",
+                    step="step_location_prompts",
                     project=project_name,
                     data={"attempt": attempt + 1, "max_retries": max_retries + 1},
                 )
@@ -1645,7 +1645,7 @@ def build_location_prompts_with_retry(
                 "visual_audio_assets",
                 "validation_complete",
                 f"Location ID Validation: total={stats['total']}, matched={stats['matched']}, fixed={stats['fixed']}, mismatched={stats['mismatched']}",
-                step="location_prompts",
+                step="step_location_prompts",
                 project=project_name,
                 data=stats,
             )
@@ -1656,7 +1656,7 @@ def build_location_prompts_with_retry(
                 "visual_audio_assets",
                 "save_complete",
                 f"Location Prompts saved to: {output_path}",
-                step="location_prompts",
+                step="step_location_prompts",
                 project=project_name,
                 data={"path": str(output_path)},
             )
@@ -1668,7 +1668,7 @@ def build_location_prompts_with_retry(
                 "visual_audio_assets",
                 "flow_error",
                 f"Failed to build location prompts: {e}",
-                step="location_prompts",
+                step="step_location_prompts",
                 project=project_name,
                 data={"error": str(e)},
             )
@@ -1678,7 +1678,7 @@ def build_location_prompts_with_retry(
                     "visual_audio_assets",
                     "log",
                     "Retrying...",
-                    step="general",
+                    step="step_location_prompts",
                     project=project_name,
                 )
                 time.sleep(2)
@@ -1688,7 +1688,7 @@ def build_location_prompts_with_retry(
                     "visual_audio_assets",
                     "flow_error",
                     "Location prompts 构建失败且重试超限",
-                    step="location_prompts",
+                    step="step_location_prompts",
                     project=project_name,
                     data={"attempt": attempt + 1, "max_retries": max_retries + 1, "error": str(e)},
                 )
@@ -1761,7 +1761,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "flow_error",
             f"Assets directory not found: {base_dir}",
-            step="start",
+            step="step_download",
             project=project_name,
         )
         emit_event(
@@ -1769,7 +1769,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "flow_error",
             f"Assets directory not found: {base_dir}",
-            step="start",
+            step="step_download",
             project=project_name,
             data={"path": str(base_dir)},
         )
@@ -1780,7 +1780,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         "visual_audio_assets",
         "config",
         f"Using Assets Directory: {base_dir}",
-        step="start",
+        step="step_download",
         project=project_name,
         data={"path": str(base_dir)},
     )
@@ -1792,7 +1792,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "flow_error",
             "Failed to download required assets from TOS",
-            step="download_assets",
+            step="step_download",
             project=project_name,
         )
         emit_event(
@@ -1800,7 +1800,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "flow_error",
             "Failed to download required assets from TOS",
-            step="download_assets",
+            step="step_download",
             project=project_name,
         )
         return
@@ -1821,7 +1821,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "flow_error",
             f"Character file not found: {char_jsonl}",
-            step="download_assets",
+            step="step_download",
             project=project_name,
         )
         emit_event(
@@ -1829,7 +1829,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "flow_error",
             f"Character file not found: {char_jsonl}",
-            step="download_assets",
+            step="step_download",
             project=project_name,
             data={"path": str(char_jsonl)},
         )
@@ -1840,7 +1840,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "flow_error",
             f"Location file not found: {loc_jsonl}",
-            step="download_assets",
+            step="step_download",
             project=project_name,
             data={"path": str(loc_jsonl)},
         )
@@ -1851,7 +1851,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         "visual_audio_assets",
         "phase_complete",
         "download assets completed",
-        step="download_assets",
+        step="step_download",
         project=project_name,
     )
 
@@ -1897,7 +1897,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "flow_start",
             f"Using Assets Directory: {base_dir}",
-            step="start",
+            step="step_download",
             project=project_name,
         )
 
@@ -1907,7 +1907,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         "visual_audio_assets",
         "step_progress",
         f"Starting Asset Generation Workflow for Project: {project_name}",
-        step="start",
+        step="step_download",
         project=project_name,
     )
     emit_event(
@@ -1915,8 +1915,8 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         "visual_audio_assets",
         "phase_start",
         "phase_assets_generation",
-        step="phase_assets_generation",
-        phase="phase_assets_generation",
+        step="step_upload",
+        phase="step_upload",
         project=project_name,
     )
     emit_event(
@@ -1924,7 +1924,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         "visual_audio_assets",
         "log",
         f"Starting Asset Generation Workflow for Project: {project_name}",
-        step="general",
+        step="step_download",
         project=project_name,
     )
 
@@ -1934,7 +1934,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         "visual_audio_assets",
         "load_complete",
         f"Loaded {len(reference_chars)} characters for ID validation",
-        step="download_assets",
+        step="step_download",
         project=project_name,
         data={"count": len(reference_chars), "type": "characters"},
     )
@@ -1944,7 +1944,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         "visual_audio_assets",
         "load_complete",
         f"Loaded {len(reference_locations)} locations for ID validation",
-        step="download_assets",
+        step="step_download",
         project=project_name,
         data={"count": len(reference_locations), "type": "locations"},
     )
@@ -1962,7 +1962,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "step_progress",
             "Building Character Prompts",
-            step="character_prompts",
+            step="step_character_prompts",
             project=project_name,
         )
         emit_event(
@@ -1970,7 +1970,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             "Starting Character Workflow...",
-            step="general",
+            step="step_character_prompts",
             project=project_name,
         )
         emit_event(
@@ -1978,7 +1978,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             "Building Character Prompts with validation...",
-            step="general",
+            step="step_character_prompts",
             project=project_name,
         )
         char_prompts_path = await loop.run_in_executor(
@@ -1989,7 +1989,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             f"Character Prompts saved to: {char_prompts_path}",
-            step="character_images",
+            step="step_character_images",
             project=project_name,
         )
         upload_jsonl_to_assets(tos_assets, char_prompts_path, "build_prompts")
@@ -1999,7 +1999,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "phase_complete",
             "character prompts completed",
-            step="character_prompts",
+            step="step_character_prompts",
             project=project_name,
         )
         return Path(char_prompts_path)
@@ -2024,7 +2024,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             "Generating Character Images...",
-            step="general",
+            step="step_character_images",
             project=project_name,
         )
         emit_event(
@@ -2032,7 +2032,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "step_progress",
             "Generating Character Images",
-            step="character_images",
+            step="step_character_images",
             project=project_name,
         )
 
@@ -2061,7 +2061,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "log",
                 f"Uploaded - File: {image_path.name}, Progress: {idx+1}, Total Generated: {total_generated_count}",
-                step="upload_assets",
+                step="step_upload",
                 project=project_name,
             )
             emit_event(
@@ -2069,7 +2069,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "upload_progress",
                 f"Uploaded - File: {image_path.name}",
-                step="character_images",
+                step="step_character_images",
                 project=project_name,
                 data={
                     "file": image_path.name,
@@ -2092,7 +2092,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             f"Generated {len(image_paths)} character images, Total Generated: {total_generated_count}",
-            step="character_images",
+            step="step_character_images",
             project=project_name,
         )
 
@@ -2101,7 +2101,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "phase_complete",
             "character images completed",
-            step="character_images",
+            step="step_character_images",
             project=project_name,
         )
 
@@ -2111,7 +2111,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "step_progress",
             "Building Location Prompts",
-            step="location_prompts",
+            step="step_location_prompts",
             project=project_name,
         )
         emit_event(
@@ -2119,7 +2119,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             "Starting Location Workflow...",
-            step="general",
+            step="step_location_prompts",
             project=project_name,
         )
         emit_event(
@@ -2127,7 +2127,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             "Building Location Prompts...",
-            step="general",
+            step="step_location_prompts",
             project=project_name,
         )
         loc_prompts_path = await loop.run_in_executor(
@@ -2138,7 +2138,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             f"Location Prompts saved to: {loc_prompts_path}",
-            step="location_images",
+            step="step_location_images",
             project=project_name,
         )
         upload_jsonl_to_assets(tos_assets, loc_prompts_path, "build_prompts")
@@ -2148,7 +2148,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "phase_complete",
             "location prompts completed",
-            step="location_prompts",
+            step="step_location_prompts",
             project=project_name,
         )
 
@@ -2158,7 +2158,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "step_progress",
             "Generating Location Images",
-            step="location_images",
+            step="step_location_images",
             project=project_name,
         )
         loc_prompts_jsonl = base_dir / "location_prompts.jsonl"
@@ -2176,7 +2176,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "flow_error",
                 f"Location prompts not found: {loc_prompts_jsonl}",
-                step="location_images",
+                step="step_location_images",
                 project=project_name,
             )
             raise FileNotFoundError(str(loc_prompts_jsonl))
@@ -2201,7 +2201,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "flow_error",
                 "Fenjing prompts missing for location images",
-                step="location_images",
+                step="step_location_images",
                 project=project_name,
                 data={"missing": missing},
             )
@@ -2214,7 +2214,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "phase_complete",
             "location images completed",
-            step="location_images",
+            step="step_location_images",
             project=project_name,
         )
 
@@ -2224,7 +2224,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "step_progress",
             "Generating TTS Audios",
-            step="tts",
+            step="step_tts",
             project=project_name,
         )
         emit_event(
@@ -2232,7 +2232,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             "Starting TTS Workflow...",
-            step="general",
+            step="step_tts",
             project=project_name,
         )
         chapters = sorted(storyboards_dir.glob("storyboard_chapter_*.jsonl"))
@@ -2242,7 +2242,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "log",
                 "No storyboard chapter files found in storyboards directory.",
-                step="general",
+                step="step_tts",
                 project=project_name,
             )
             return
@@ -2252,7 +2252,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             f"Found {len(chapters)} chapters for TTS.",
-            step="tts",
+            step="step_tts",
             project=project_name,
         )
 
@@ -2266,7 +2266,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "log",
                 f"Processing TTS for {chapter_file.name}...",
-                step="tts",
+                step="step_tts",
                 project=project_name,
             )
             tts_prompts_path = await loop.run_in_executor(
@@ -2295,7 +2295,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "log",
                 f"TTS for {chapter_file.name} completed.",
-                step="tts",
+                step="step_tts",
                 project=project_name,
             )
 
@@ -2306,7 +2306,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "phase_complete",
             "tts completed",
-            step="tts",
+            step="step_tts",
             project=project_name,
         )
 
@@ -2316,7 +2316,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "step_progress",
             "Building Fenjing Prompts",
-            step="fenjing_prompts",
+            step="step_fenjing_prompts",
             project=project_name,
         )
         emit_event(
@@ -2324,7 +2324,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "log",
             "Starting Fenjing Prompt Workflow...",
-            step="general",
+            step="step_fenjing_prompts",
             project=project_name,
         )
         chapters = sorted(storyboards_dir.glob("storyboard_chapter_*.jsonl"))
@@ -2334,7 +2334,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "log",
                 "No storyboard chapter files found for fenjing prompts.",
-                step="general",
+                step="step_fenjing_prompts",
                 project=project_name,
             )
             return
@@ -2365,7 +2365,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                             "visual_audio_assets",
                             "log",
                             f"Uploaded fenjing prompts to {key}",
-                            step="fenjing_prompts",
+                            step="step_fenjing_prompts",
                             project=project_name,
                         )
                     else:
@@ -2374,7 +2374,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                             "visual_audio_assets",
                             "log",
                             f"Failed to upload fenjing prompts to {key}",
-                        step="fenjing_prompts",
+                        step="step_fenjing_prompts",
                         project=project_name,
                     )
 
@@ -2384,7 +2384,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "log",
                 "Fenjing prompts generation skipped by phase selector",
-                step="general",
+                step="step_fenjing_prompts",
                 project=project_name,
             )
             return
@@ -2401,7 +2401,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                     "visual_audio_assets",
                     "flow_error",
                     f"Fenjing Prompt Workflow failed: {r}",
-                    step="fenjing_prompts",
+                    step="step_fenjing_prompts",
                     project=project_name,
                 )
             raise RuntimeError("Fenjing prompts generation failed")
@@ -2411,25 +2411,25 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "visual_audio_assets",
             "phase_complete",
             "fenjing prompts completed",
-            step="fenjing_prompts",
+            step="step_fenjing_prompts",
             project=project_name,
         )
 
     async def run_cloth_workflow():
         cloth_images_selected = "cloth_images" in phases
         cloth_changed_selected = "cloth_changed" in phases
-        phase_step = "phase_cloth_generation" if cloth_images_selected else "cloth_changed"
+        phase_step = "step_cloth_images" if cloth_images_selected else "step_cloth_changed"
         emit_event(
             "INFO",
             "visual_audio_assets",
             "phase_start",
             "phase_cloth_generation",
             step=phase_step,
-            phase="phase_cloth_generation",
+            phase="step_cloth_images",
             project=project_name,
         )
         try:
-            validate_step = "validate_cloth" if cloth_images_selected else "cloth_changed"
+            validate_step = "step_cloth_images" if cloth_images_selected else "step_cloth_changed"
             emit_event(
                 "INFO",
                 "visual_audio_assets",
@@ -2455,7 +2455,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                     "visual_audio_assets",
                     "step_progress",
                     "generate_cloth_images",
-                    step="cloth_images",
+                    step="step_cloth_images",
                     project=project_name,
                 )
                 cloth_upload = await loop.run_in_executor(None, generate_cloth_images, char_jsonl, base_dir, "", project_name)
@@ -2467,7 +2467,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                     "visual_audio_assets",
                     "phase_complete",
                     "cloth images completed",
-                    step="cloth_images",
+                    step="step_cloth_images",
                     project=project_name,
                 )
             if cloth_changed_selected:
@@ -2479,7 +2479,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                         "visual_audio_assets",
                         "phase_complete",
                         "cloth changed completed",
-                        step="cloth_changed",
+                        step="step_cloth_changed",
                         project=project_name,
                     )
                 else:
@@ -2488,7 +2488,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                         "visual_audio_assets",
                         "step_progress",
                         "generate_cloth_changed_images",
-                        step="cloth_changed",
+                        step="step_cloth_changed",
                         project=project_name,
                     )
                     cloth_changed_upload = []
@@ -2515,7 +2515,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                         "visual_audio_assets",
                         "phase_complete",
                         "cloth changed completed",
-                        step="cloth_changed",
+                        step="step_cloth_changed",
                         project=project_name,
                     )
         except (IOError, OSError) as exc:
@@ -2524,7 +2524,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "flow_error",
                 f"Cloth workflow failed: {exc}",
-            step="cloth_images",
+            step="step_cloth_images",
                 project=project_name,
             )
             raise
@@ -2534,7 +2534,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
             "phase_complete",
             "phase_cloth_generation completed",
             step=phase_step,
-            phase="phase_cloth_generation",
+            phase="step_cloth_images",
             project=project_name,
         )
 
@@ -2557,10 +2557,10 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                     "flow_error",
                     f"Phase failed: {name}",
                     step={
-                        "character_prompts": "character_prompts",
-                        "location_prompts": "location_prompts",
-                        "generate_tts": "tts",
-                        "fenjing_prompts": "fenjing_prompts",
+                        "character_prompts": "step_character_prompts",
+                        "location_prompts": "step_location_prompts",
+                        "generate_tts": "step_tts",
+                        "fenjing_prompts": "step_fenjing_prompts",
                     }.get(name, name),
                     project=project_name,
                     data={"error": str(result)},
@@ -2574,7 +2574,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "flow_error",
                 "Location images skipped due to prompt failures",
-                step="location_images",
+                step="step_location_images",
                 project=project_name,
                 data={"failed": list(failed_phases.keys())},
             )
@@ -2589,7 +2589,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                     "visual_audio_assets",
                     "flow_error",
                     f"Location images failed: {exc}",
-                    step="location_images",
+                    step="step_location_images",
                     project=project_name,
                 )
     if "upload_assets" in phases:
@@ -2607,8 +2607,8 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
         "visual_audio_assets",
         "phase_complete",
         "phase_assets_generation completed",
-        step="phase_assets_generation",
-        phase="phase_assets_generation",
+        step="step_upload",
+        phase="step_upload",
         project=project_name,
     )
     if full_phase_run:
@@ -2618,7 +2618,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "flow_complete",
                 "Workflows completed with errors",
-                step="complete",
+                step="step_upload",
                 project=project_name,
                 data={"failed": failed_phases},
             )
@@ -2627,7 +2627,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "log",
                 "Workflows completed with errors.",
-                step="general",
+                step="step_upload",
                 project=project_name,
             )
         else:
@@ -2636,7 +2636,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "flow_complete",
                 "All workflows completed successfully",
-                step="complete",
+                step="step_upload",
                 project=project_name,
             )
             emit_event(
@@ -2644,7 +2644,7 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
                 "visual_audio_assets",
                 "log",
                 "All workflows completed successfully.",
-                step="general",
+                step="step_upload",
                 project=project_name,
             )
 

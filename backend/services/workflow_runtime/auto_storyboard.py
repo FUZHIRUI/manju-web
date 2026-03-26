@@ -177,7 +177,7 @@ def call_ark_responses_api(
                 method="POST",
                 model=payload.get("model"),
                 request_payload=request_payload,
-                step="ark_responses",
+                step="step_extract",
                 project=project_name,
             )
             response = requests.post(url, headers=headers, json=payload, timeout=timeout_sec)
@@ -219,7 +219,7 @@ def call_ark_responses_api(
                 duration_ms=duration_ms,
                 request_id=request_id,
                 response_payload=resp_json,
-                step="ark_responses",
+                step="step_extract",
                 project=project_name,
             )
             finish_reason = None
@@ -317,7 +317,7 @@ async def call_ark_responses_api_async(
                 method="POST",
                 model=payload.get("model"),
                 request_payload={"headers": headers, "payload": payload},
-                step="ark_responses",
+                step="step_extract",
                 project=project_name,
             )
             response = await client.post(url, headers=headers, json=payload)
@@ -331,7 +331,7 @@ async def call_ark_responses_api_async(
                         "auto_storyboard",
                         "log",
                         f"[WARN] [Async] API 不支持 reasoning 参数。正在重试...",
-                        step="storyboard",
+                        step="step_storyboard",
                         project=project_name,
                     )
                     if "reasoning" in payload:
@@ -360,7 +360,7 @@ async def call_ark_responses_api_async(
                 duration_ms=duration_ms,
                 request_id=request_id,
                 response_payload=resp_json,
-                step="ark_responses",
+                step="step_extract",
                 project=project_name,
             )
             
@@ -377,7 +377,7 @@ async def call_ark_responses_api_async(
                 "auto_storyboard",
                 "flow_error",
                 f"[ERROR] [Async] API 请求失败: {e}",
-                step="storyboard",
+                step="step_storyboard",
                 project=project_name,
             )
             emit_event(
@@ -385,7 +385,7 @@ async def call_ark_responses_api_async(
                 "auto_storyboard",
                 "flow_error",
                 f"[ERROR] 响应内容: {e.response.text}",
-                step="storyboard",
+                step="step_storyboard",
                 project=project_name,
             )
             api_log_event(
@@ -401,7 +401,7 @@ async def call_ark_responses_api_async(
                 response_payload=e.response.text,
                 error_type=type(e).__name__,
                 error_message=str(e),
-                step="ark_responses",
+                step="step_extract",
                 project=project_name,
             )
             raise
@@ -411,7 +411,7 @@ async def call_ark_responses_api_async(
                 "auto_storyboard",
                 "flow_error",
                 f"[ERROR] [Async] 网络错误: {e}",
-                step="storyboard",
+                step="step_storyboard",
                 project=project_name,
             )
             api_log_event(
@@ -425,7 +425,7 @@ async def call_ark_responses_api_async(
                 model=payload.get("model"),
                 error_type=type(e).__name__,
                 error_message=str(e),
-                step="ark_responses",
+                step="step_extract",
                 project=project_name,
             )
             raise
@@ -754,7 +754,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
         "auto_storyboard",
         "upload_start",
         f"开始上传资产到 TOS: {runtime_config.TOS_BUCKET}/{tos_assets_prefix}",
-        step="upload",
+        step="step_upload",
         project=actual_project_name,
     )
     emit_event(
@@ -762,7 +762,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
         "auto_storyboard",
         "log",
         f"[*] {prefix}开始上传资产到 TOS: {runtime_config.TOS_BUCKET}/{tos_assets_prefix} ...",
-        step="storyboard",
+        step="step_upload",
         project=actual_project_name,
     )
     try:
@@ -773,7 +773,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
                 "auto_storyboard",
                 "upload_complete",
                 "TOS 客户端不可用，跳过上传",
-                step="upload",
+                step="step_upload",
                 project=actual_project_name,
                 data={"skipped": True},
             )
@@ -782,7 +782,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
                 "auto_storyboard",
                 "log",
                 f"[WARN] {prefix}TOS 客户端不可用，跳过上传。",
-                step="storyboard",
+                step="step_upload",
                 project=actual_project_name,
             )
             return False
@@ -798,7 +798,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
                 "auto_storyboard",
                 "upload_progress",
                 f"Uploaded: {f.name} -> {key}",
-                step="upload",
+                step="step_upload",
                 project=actual_project_name,
                 data={"file": f.name, "key": key, "uploaded": uploaded_count},
             )
@@ -807,7 +807,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
                 "auto_storyboard",
                 "log",
                 f"[INFO] {prefix}Uploaded: {f.name} -> {key}",
-                step="storyboard",
+                step="step_upload",
                 project=actual_project_name,
             )
 
@@ -823,7 +823,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
                     "auto_storyboard",
                     "upload_progress",
                     f"Uploaded: storyboards/{f.name} -> {key}",
-                    step="upload",
+                    step="step_upload",
                     project=actual_project_name,
                     data={"file": f"storyboards/{f.name}", "key": key, "uploaded": uploaded_count},
                 )
@@ -832,7 +832,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
                     "auto_storyboard",
                     "log",
                     f"[INFO] {prefix}Uploaded: storyboards/{f.name} -> {key}",
-                    step="storyboard",
+                    step="step_upload",
                     project=actual_project_name,
                 )
 
@@ -841,7 +841,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
             "auto_storyboard",
             "upload_complete",
             "资产上传完成",
-            step="upload",
+            step="step_upload",
             project=actual_project_name,
             data={"uploaded": uploaded_count},
         )
@@ -850,7 +850,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
             "auto_storyboard",
             "log",
             f"[*] {prefix}资产上传完成。",
-            step="storyboard",
+            step="step_upload",
             project=actual_project_name,
         )
         return True
@@ -860,7 +860,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
             "auto_storyboard",
             "flow_error",
             f"资产上传失败: {e}",
-            step="upload",
+            step="step_upload",
             project=actual_project_name,
         )
         emit_event(
@@ -868,7 +868,7 @@ def upload_generated_assets(local_base_dir: Path, prefix: str = "", project_name
             "auto_storyboard",
             "flow_error",
             f"[ERROR] {prefix}资产上传失败: {e}",
-            step="storyboard",
+            step="step_upload",
             project=actual_project_name,
         )
         return False
@@ -890,8 +890,8 @@ def run_workflow(
     协调执行Phase 1和Phase 2，完成从小说文本到分镜剧本的完整转换
 
     【执行模式】
-    - phase="phase1": 仅执行Phase 1，提取角色/摘要/地点
-    - phase="phase2": 仅执行Phase 2，基于已有资产生成分镜
+    - phase="step_extract": 仅执行Phase 1，提取角色/摘要/地点
+    - phase="step_storyboard": 仅执行Phase 2，基于已有资产生成分镜
     - phase="full": 执行完整流程(Phase 1 + Phase 2)
 
     【参数】
@@ -918,7 +918,7 @@ def run_workflow(
         "auto_storyboard",
         "flow_start",
         f"开始处理小说: {novel_path}",
-        step="start",
+        step="step_extract",
         phase=phase,
         project=project_name,
     )
@@ -930,7 +930,7 @@ def run_workflow(
         "auto_storyboard",
         "log",
         f"[*] {prefix}开始处理小说: {novel_path}",
-        step="storyboard",
+        step="step_extract",
         project=actual_project_name,
     )
     
@@ -972,8 +972,8 @@ def run_workflow(
             "auto_storyboard",
             "phase_cleanup",
             "清理 Phase 1 产物",
-            step="phase_cleanup",
-            phase="phase1",
+            step="step_extract",
+            phase="step_extract",
             project=project_name,
             data={"removed": removed, "errors": errors},
         )
@@ -982,7 +982,7 @@ def run_workflow(
             "auto_storyboard",
             "log",
             f"[*] {prefix}清理 Phase 1 产物，删除 {len(removed)} 项。",
-            step="phase1",
+            step="step_extract",
             project=actual_project_name,
         )
 
@@ -999,8 +999,8 @@ def run_workflow(
             "auto_storyboard",
             "phase_cleanup",
             "清理 Phase 2 产物",
-            step="phase_cleanup",
-            phase="phase2",
+            step="step_storyboard",
+            phase="step_storyboard",
             project=project_name,
             data={"removed": removed, "errors": errors},
         )
@@ -1009,7 +1009,7 @@ def run_workflow(
             "auto_storyboard",
             "log",
             f"[*] {prefix}清理 Phase 2 产物，删除 {len(removed)} 项。",
-            step="phase2",
+            step="step_storyboard",
             project=actual_project_name,
         )
 
@@ -1053,7 +1053,7 @@ def run_workflow(
                 "auto_storyboard",
                 "log",
                 f"[INFO] {prefix}小说字数: {word_count}, 建议章节数: {final_target_chapters} ",
-                step="storyboard",
+                step="step_extract",
                 project=actual_project_name,
             )
             emit_event(
@@ -1061,8 +1061,8 @@ def run_workflow(
                 "auto_storyboard",
                 "phase_start",
                 "阶段 1: 提取人物、摘要和地点",
-                step="phase1",
-                phase="phase1",
+                step="step_extract",
+                phase="step_extract",
                 project=project_name,
             )
             emit_event(
@@ -1070,7 +1070,7 @@ def run_workflow(
                 "auto_storyboard",
                 "log",
                 f"[*] {prefix}阶段 1: 提取人物、摘要和地点...",
-                step="storyboard",
+                step="step_extract",
                 project=actual_project_name,
             )
 
@@ -1096,8 +1096,8 @@ def run_workflow(
                     "auto_storyboard",
                     "step_progress",
                     f"阶段 1 调用 API (尝试 {phase1_retry_count + 1}/{max_retries})",
-                    step="phase1_api_call",
-                    phase="phase1",
+                    step="step_extract",
+                    phase="step_extract",
                     project=project_name,
                     data={"attempt": phase1_retry_count + 1, "max": max_retries},
                 )
@@ -1106,7 +1106,7 @@ def run_workflow(
                     "auto_storyboard",
                     "retry",
                     f"[*] {prefix}阶段 1 调用 API (尝试 {phase1_retry_count + 1}/{max_retries})...",
-                    step="storyboard",
+                    step="step_extract",
                     project=actual_project_name,
                 )
                 try:
@@ -1123,8 +1123,8 @@ def run_workflow(
                             "auto_storyboard",
                             "phase_error",
                             "阶段 1 API 无响应或响应格式异常",
-                            step="phase1",
-                            phase="phase1",
+                            step="step_extract",
+                            phase="step_extract",
                             project=project_name,
                         )
                         emit_event(
@@ -1132,7 +1132,7 @@ def run_workflow(
                             "auto_storyboard",
                             "log",
                             f"[WARN] {prefix}阶段 1 API 无响应或响应格式异常。",
-                            step="storyboard",
+                            step="step_extract",
                             project=actual_project_name,
                         )
                         phase1_retry_count += 1
@@ -1153,7 +1153,7 @@ def run_workflow(
                             "auto_storyboard",
                             "flow_error",
                             f"[ERROR] {prefix}意外的响应结构: {resp_phase1.keys()}",
-                            step="storyboard",
+                            step="step_extract",
                             project=actual_project_name,
                         )
                         phase1_retry_count += 1
@@ -1164,7 +1164,7 @@ def run_workflow(
                         "auto_storyboard",
                         "log",
                         f"[*] {prefix}阶段 1 完成。Response ID: {phase1_response_id}",
-                        step="storyboard",
+                        step="step_extract",
                         project=actual_project_name,
                     )
 
@@ -1173,7 +1173,7 @@ def run_workflow(
                         "auto_storyboard",
                         "log",
                         f"[*] {prefix}正在校验 Phase 1 输出格式...",
-                        step="phase1",
+                        step="step_extract",
                         project=actual_project_name,
                     )
                     extracted_lists = extract_all_json_lists(phase1_content)
@@ -1209,8 +1209,8 @@ def run_workflow(
                             "auto_storyboard",
                             "phase_complete",
                             f"阶段 1 完成。Response ID: {phase1_response_id}",
-                            step="phase1",
-                            phase="phase1",
+                            step="step_extract",
+                            phase="step_extract",
                             project=project_name,
                             data={"response_id": phase1_response_id},
                         )
@@ -1219,7 +1219,7 @@ def run_workflow(
                             "auto_storyboard",
                             "log",
                             f"[INFO] {prefix}Phase 1 校验通过，提取成功。",
-                            step="phase1",
+                            step="step_extract",
                             project=actual_project_name,
                         )
                         break
@@ -1228,7 +1228,7 @@ def run_workflow(
                         "auto_storyboard",
                         "log",
                         f"[WARN] {prefix}Phase 1 校验失败，缺失: {', '.join(missing)}。",
-                        step="phase1",
+                        step="step_extract",
                         project=actual_project_name,
                     )
                     emit_event(
@@ -1236,7 +1236,7 @@ def run_workflow(
                         "auto_storyboard",
                         "log",
                         f"[DEBUG] {prefix}原始内容前 500 字符:\n{phase1_content[:500]}",
-                        step="storyboard",
+                        step="step_extract",
                         project=actual_project_name,
                     )
 
@@ -1258,7 +1258,7 @@ def run_workflow(
                         "auto_storyboard",
                         "flow_error",
                         f"[ERROR] {prefix}Phase 1 API 调用异常: {e}",
-                        step="phase1",
+                        step="step_extract",
                         project=actual_project_name,
                     )
                     phase1_retry_count += 1
@@ -1270,8 +1270,8 @@ def run_workflow(
                     "auto_storyboard",
                     "flow_error",
                     "Phase 1 重试多次后仍失败。无法继续执行工作流。",
-                    step="phase1",
-                    phase="phase1",
+                    step="step_extract",
+                    phase="step_extract",
                     project=project_name,
                 )
                 emit_event(
@@ -1279,7 +1279,7 @@ def run_workflow(
                 "auto_storyboard",
                 "flow_error",
                 f"[ERROR] {prefix}Phase 1 重试多次后仍失败。无法继续执行工作流。",
-                step="phase1",
+                step="step_extract",
                 project=actual_project_name,
             )
                 return
@@ -1289,7 +1289,7 @@ def run_workflow(
                 "auto_storyboard",
                 "log",
                 f"[*] {prefix}保存原始资产 (Raw)...",
-                step="storyboard",
+                step="step_extract",
                 project=actual_project_name,
             )
             save_jsonl(characters_list, output_base / "raw_characters.jsonl")
@@ -1300,7 +1300,7 @@ def run_workflow(
                 "auto_storyboard",
                 "log",
                 f"[*] {prefix}正在执行资产 ID 清洗与重置...",
-                step="storyboard",
+                step="step_extract",
                 project=actual_project_name,
             )
             characters_list, locations_list, id_map = sanitize_assets(characters_list, locations_list)
@@ -1309,7 +1309,7 @@ def run_workflow(
                 "auto_storyboard",
                 "log",
                 f"[INFO] {prefix}已重置 {len(id_map)} 个 ID。示例映射: {list(id_map.items())[:3]}",
-                step="storyboard",
+                step="step_extract",
                 project=actual_project_name,
             )
             save_jsonl(characters_list, output_base / "characters.jsonl")
@@ -1333,7 +1333,7 @@ def run_workflow(
                 "auto_storyboard",
                 "step_progress",
                 f"资产已保存到 {output_base}",
-                step="assets_saved",
+                step="step_extract",
                 project=project_name,
             )
             emit_event(
@@ -1341,7 +1341,7 @@ def run_workflow(
                 "auto_storyboard",
                 "log",
                 f"[*] {prefix}资产已保存到 {output_base}",
-                step="storyboard",
+                step="step_extract",
                 project=actual_project_name,
             )
 
@@ -1355,8 +1355,8 @@ def run_workflow(
             "auto_storyboard",
             "phase_start",
             "阶段 3: 上传资产",
-            step="upload",
-            phase="upload",
+            step="step_upload",
+            phase="step_upload",
             project=actual_project_name,
         )
         upload_ok = upload_generated_assets(output_base, prefix, actual_project_name)
@@ -1366,8 +1366,8 @@ def run_workflow(
                 "auto_storyboard",
                 "phase_complete",
                 "上传完成",
-                step="upload",
-                phase="upload",
+                step="step_upload",
+                phase="step_upload",
                 project=actual_project_name,
             )
         return
@@ -1382,8 +1382,8 @@ def run_workflow(
                 "auto_storyboard",
                 "flow_error",
                 "Phase 1 产物不存在，无法执行 Phase 2",
-                step="phase2",
-                phase="phase2",
+                step="step_storyboard",
+                phase="step_storyboard",
                 project=project_name,
             )
             emit_event(
@@ -1391,7 +1391,7 @@ def run_workflow(
                 "auto_storyboard",
                 "flow_error",
                 f"[ERROR] {prefix}Phase 1 产物不存在，无法执行 Phase 2",
-                step="phase1",
+                step="step_extract",
                 project=actual_project_name,
             )
             raise RuntimeError("Phase 1 产物不存在，无法执行 Phase 2")
@@ -1405,8 +1405,8 @@ def run_workflow(
             "auto_storyboard",
             "flow_error",
             "摘要表为空，无法执行 Phase 2",
-            step="phase2",
-            phase="phase2",
+            step="step_storyboard",
+            phase="step_storyboard",
             project=project_name,
         )
         emit_event(
@@ -1414,7 +1414,7 @@ def run_workflow(
                 "auto_storyboard",
                 "flow_error",
                 f"[ERROR] {prefix}摘要表为空，无法执行 Phase 2",
-                step="phase2",
+                step="step_storyboard",
                 project=actual_project_name,
             )
         return
@@ -1424,8 +1424,8 @@ def run_workflow(
         "auto_storyboard",
         "phase_start",
         "阶段 2: 生成分镜",
-        step="phase2",
-        phase="phase2",
+        step="step_storyboard",
+        phase="step_storyboard",
         project=project_name,
     )
     emit_event(
@@ -1433,7 +1433,7 @@ def run_workflow(
             "auto_storyboard",
             "log",
             f"[*] {prefix}阶段 2: 生成分镜...",
-            step="storyboard",
+            step="step_storyboard",
             project=actual_project_name,
         )
     
@@ -1460,8 +1460,8 @@ def run_workflow(
             "auto_storyboard",
             "step_progress",
             f"开始处理章节 {batch_start}-{batch_end}",
-            step="phase2_batch_progress",
-            phase="phase2",
+            step="step_storyboard",
+            phase="step_storyboard",
             project=project_name,
             chapter=f"{batch_start}-{batch_end}",
             data={"batch_start": batch_start, "batch_end": batch_end},
@@ -1471,7 +1471,7 @@ def run_workflow(
             "auto_storyboard",
             "step_progress",
             f"[*] {full_prefix}开始处理章节 {batch_start}-{batch_end}...",
-            step="storyboard",
+            step="step_storyboard",
             project=actual_project_name,
         )
         
@@ -1487,7 +1487,7 @@ def run_workflow(
                     "auto_storyboard",
                     "step_progress",
                     f"[DEBUG] {full_prefix}批次 {batch_start}-{batch_end} 使用摘要索引 {s_idx}-{e_idx} (共 {len(current_batch_sums)} 条)",
-                    step="storyboard",
+                    step="step_storyboard",
                     project=actual_project_name,
                 )
             else:
@@ -1496,7 +1496,7 @@ def run_workflow(
                     "auto_storyboard",
                     "log",
                     f"[WARN] {full_prefix}摘要数量 ({len(summaries_list)}) 少于目标章节 {batch_end}，发送全部摘要",
-                    step="storyboard",
+                    step="step_storyboard",
                     project=actual_project_name,
                 )
                 current_batch_sums = summaries_list
@@ -1563,7 +1563,7 @@ def run_workflow(
                         "auto_storyboard",
                         "retry",
                         f"[WARN] {full_prefix}未提取到 JSON 列表 (尝试 {retry_count+1}/{max_retries})",
-                        step="storyboard",
+                        step="step_storyboard",
                         project=actual_project_name,
                     )
                     retry_count += 1
@@ -1589,7 +1589,7 @@ def run_workflow(
                             "auto_storyboard",
                             "log",
                             f"[INFO] {full_prefix}修正: 人物ID修正={stats['char_fixed']}, 地点ID修正={stats['loc_fixed']}",
-                            step="storyboard",
+                            step="step_storyboard",
                             project=actual_project_name,
                         )
                     # -------------------------
@@ -1612,7 +1612,7 @@ def run_workflow(
                     "auto_storyboard",
                     "flow_error",
                     f"[ERROR] {full_prefix}触发内容风控！跳过此批次。",
-                    step="storyboard",
+                    step="step_storyboard",
                     project=actual_project_name,
                 )
                 err_dir = output_base / "storyboards"
@@ -1626,7 +1626,7 @@ def run_workflow(
                     "auto_storyboard",
                     "flow_error",
                     f"[ERROR] {full_prefix}API 调用失败: {e} (尝试 {retry_count+1}/{max_retries})",
-                    step="storyboard",
+                    step="step_storyboard",
                     project=actual_project_name,
                 )
                 retry_count += 1
@@ -1639,8 +1639,8 @@ def run_workflow(
                         "auto_storyboard",
                         "flow_error",
                         f"Phase 2 批次 {batch_start}-{batch_end} 重试超限，API 调用失败",
-                        step="phase2",
-                        phase="phase2",
+                        step="step_storyboard",
+                        phase="step_storyboard",
                         project=project_name,
                         data={
                             "batch_start": batch_start,
@@ -1662,8 +1662,8 @@ def run_workflow(
                 "auto_storyboard",
                 "flow_error",
                 f"Phase 2 批次 {batch_start}-{batch_end} 重试超限，未解析到有效 JSON 列表",
-                step="phase2",
-                phase="phase2",
+                step="step_storyboard",
+                phase="step_storyboard",
                 project=project_name,
                 data={
                     "batch_start": batch_start,
@@ -1682,7 +1682,7 @@ def run_workflow(
         "auto_storyboard",
         "log",
         f"[INFO] {prefix}根据摘要列表估算总章节数: {total_chapters_est}",
-        step="storyboard",
+        step="step_storyboard",
         project=actual_project_name,
     )
     if total_chapters_est == 0:
@@ -1691,7 +1691,7 @@ def run_workflow(
             "auto_storyboard",
             "log",
             f"[WARN] {prefix}无法估算总章节数，跳过分镜生成。",
-            step="storyboard",
+            step="step_storyboard",
             project=actual_project_name,
         )
         return
@@ -1702,7 +1702,7 @@ def run_workflow(
             "auto_storyboard",
             "log",
             f"[INFO] {prefix}固定并行生成 (Async Coroutines)，并发由模型限流统一控制。",
-            step="storyboard",
+            step="step_storyboard",
             project=actual_project_name,
         )
         emit_event(
@@ -1710,7 +1710,7 @@ def run_workflow(
             "auto_storyboard",
             "log",
             f"[WARN] {prefix}并行模式下，将无法使用'最近三章分镜'作为上下文，仅依赖章节摘要。",
-            step="storyboard",
+            step="step_storyboard",
             project=actual_project_name,
         )
         tasks = []
@@ -1721,7 +1721,7 @@ def run_workflow(
             "auto_storyboard",
             "log",
             f"[INFO] {prefix}预计总请求数: {total_requests}",
-            step="storyboard",
+            step="step_storyboard",
             project=actual_project_name,
         )
         req_count = 0
@@ -1741,8 +1741,8 @@ def run_workflow(
                         "auto_storyboard",
                         "step_progress",
                         f"批次 {first_chap}-{last_chap} 完成",
-                        step="phase2_batch_progress",
-                        phase="phase2",
+                        step="step_storyboard",
+                        phase="step_storyboard",
                         project=project_name,
                         chapter=f"{first_chap}-{last_chap}",
                         data={"batch_start": first_chap, "batch_end": last_chap, "status": "completed"},
@@ -1752,7 +1752,7 @@ def run_workflow(
                         "auto_storyboard",
                         "log",
                         f"[*] {prefix}批次 {first_chap}-{last_chap} 完成。",
-                        step="storyboard",
+                        step="step_storyboard",
                         project=actual_project_name,
                     )
             except (IOError, OSError, ValueError) as e:
@@ -1761,7 +1761,7 @@ def run_workflow(
                     "auto_storyboard",
                     "flow_error",
                     f"[ERROR] {prefix}异步任务异常: {e}",
-                    step="storyboard",
+                    step="step_storyboard",
                     project=actual_project_name,
                 )
 
@@ -1771,8 +1771,8 @@ def run_workflow(
         "auto_storyboard",
         "phase_complete",
         "并行生成完成",
-        step="phase2",
-        phase="phase2",
+        step="step_storyboard",
+        phase="step_storyboard",
         project=project_name,
     )
     emit_event(
@@ -1780,7 +1780,7 @@ def run_workflow(
         "auto_storyboard",
         "log",
         f"[*] {prefix}并行生成完成。",
-        step="storyboard",
+        step="step_storyboard",
         project=actual_project_name,
     )
     # 只有 full 模式才自动执行上传，step2 模式需要单独调用 step3_upload
@@ -1792,7 +1792,7 @@ def run_workflow(
                 "auto_storyboard",
                 "flow_complete",
                 "auto_storyboard 完成",
-                step="complete",
+                step="step_storyboard",
                 project=actual_project_name,
             )
     else:
@@ -1802,8 +1802,8 @@ def run_workflow(
             "auto_storyboard",
             "phase_complete",
             "阶段 2 完成",
-            step="phase2",
-            phase="phase2",
+            step="step_storyboard",
+            phase="step_storyboard",
             project=actual_project_name,
         )
     return
@@ -1818,6 +1818,6 @@ if __name__ == "__main__":
             "auto_storyboard",
             "log",
             "用法: python -m backend.services.workflow_runtime.auto_storyboard <novel_path>",
-            step="storyboard",
+            step="step_storyboard",
             project=runtime_config.PROJECT_NAME,
         )

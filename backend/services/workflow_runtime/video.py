@@ -31,7 +31,7 @@ def _video_download_file_from_tos(bucket: str, key: str, local_path: Path, tos_c
             "video",
             "log",
             f"Failed to download {key}: {e}",
-            step="download_assets",
+            step="step_prepare",
             project=project_name,
         )
         return False
@@ -138,7 +138,7 @@ def list_tos_keys(bucket: str, prefix: str, project_name: Optional[str] = None) 
             "video",
             "log",
             f"Failed to list TOS keys for prefix : {e}",
-            step="general",
+            step="step_prepare",
             project=project_name,
         )
         return []
@@ -170,7 +170,7 @@ def generate_video_prompts(
         "video",
         "log",
         f"{label}[Phase 1] Generating video prompts with LLM, total items: {len(fenjing_items)}",
-        step="fenjing_prompts",
+        step="step_video_prompts",
         project=project_name,
     )
     
@@ -195,7 +195,7 @@ def generate_video_prompts(
         "video",
         "log",
         f"{label}[Phase 1] Video prompts saved to {output_path}, total valid items: {len(items)}",
-        step="general",
+        step="step_video_prompts",
         project=project_name,
     )
     return output_path
@@ -216,7 +216,7 @@ def get_duration_ffmpeg(file_path: str, fenjing_id: str, prefix: str = "", proje
             "video",
             "log",
             f"[Phase 2] Fenjing {fenjing_id}: Audio duration = {duration:.2f}s",
-            step="fenjing_prompts",
+            step="step_video_prompts",
             project=project_name,
         )
         return duration
@@ -226,7 +226,7 @@ def get_duration_ffmpeg(file_path: str, fenjing_id: str, prefix: str = "", proje
             "video",
             "log",
             f"[Phase 2] Fenjing {fenjing_id}: ffprobe failed for {file_path}: {e}",
-            step="fenjing_prompts",
+            step="step_video_prompts",
             project=project_name,
         )
         return 0.0
@@ -276,7 +276,7 @@ async def get_audio_duration_with_retry(
                 "video",
                 "log",
                 f"[Phase 2] Fenjing {fenjing_id}: Downloading TTS audio from TOS (attempt {attempt + 1}/{max_retries}), key={key}",
-                step="fenjing_prompts",
+                step="step_video_prompts",
                 project=project_name,
             )
             presigned = tos.presign_get(runtime_config.TOS_BUCKET, key)
@@ -289,7 +289,7 @@ async def get_audio_duration_with_retry(
                 "video",
                 "log",
                 f"[Phase 2] Fenjing {fenjing_id}: Failed to get presigned URL or download audio (attempt {attempt + 1}/{max_retries})",
-                step="fenjing_prompts",
+                step="step_video_prompts",
                 project=project_name,
             )
             if attempt < max_retries - 1:
@@ -300,7 +300,7 @@ async def get_audio_duration_with_retry(
                 "video",
                 "log",
                 f"[Phase 2] Fenjing {fenjing_id}: Exception while getting audio duration (attempt {attempt + 1}/{max_retries}): {e}",
-                step="fenjing_prompts",
+                step="step_video_prompts",
                 project=project_name,
             )
             if attempt < max_retries - 1:
@@ -311,7 +311,7 @@ async def get_audio_duration_with_retry(
         "video",
         "log",
         f"[Phase 2] Fenjing {fenjing_id}: Could not get duration after {max_retries} retries, defaulting to {default_duration:.1f}s",
-        step="fenjing_prompts",
+        step="step_video_prompts",
         project=project_name,
     )
     return default_duration
@@ -332,7 +332,7 @@ async def batch_get_audio_durations(
         "video",
         "log",
         f"[Phase 2] Starting batch audio duration retrieval for {len(fenjing_ids)} items, QPS={qps}",
-        step="fenjing_prompts",
+        step="step_video_prompts",
         project=project_name,
     )
     
@@ -353,7 +353,7 @@ async def batch_get_audio_durations(
         "video",
         "log",
         f"[Phase 2] Audio duration retrieval completed, got {len(duration_map)} durations",
-        step="general",
+        step="step_video_prompts",
         project=project_name,
     )
     return duration_map
@@ -383,7 +383,7 @@ async def create_video_task_with_retry(
                 "video",
                 "log",
                 f"[Phase 3] Fenjing {fenjing_id}: Creating video task (attempt {attempt + 1}/{max_retries}), generate_audio={generate_audio}",
-                step="fenjing_prompts",
+                step="step_video_generation",
                 project=project_name,
             )
             emit_event(
@@ -391,7 +391,7 @@ async def create_video_task_with_retry(
                 "video",
                 "fenjing_video_task_create_start",
                 f"Fenjing {fenjing_id} creating video task (attempt {attempt + 1}/{max_retries})",
-                step="fenjing_video_task_create",
+                step="step_video_generation",
                 project=project_name,
                 chapter=chapter_name,
                 fenjing_id=fenjing_id,
@@ -413,7 +413,7 @@ async def create_video_task_with_retry(
                     "video",
                     "log",
                     f"[Phase 3] Fenjing {fenjing_id}: Video task created successfully, TaskID={task_id}",
-                    step="fenjing_prompts",
+                    step="step_video_generation",
                     project=project_name,
                 )
                 emit_event(
@@ -421,7 +421,7 @@ async def create_video_task_with_retry(
                     "video",
                     "fenjing_video_task_created",
                     f"Fenjing {fenjing_id} video task created",
-                    step="fenjing_video_task_create",
+                    step="step_video_generation",
                     project=project_name,
                     chapter=chapter_name,
                     fenjing_id=fenjing_id,
@@ -434,7 +434,7 @@ async def create_video_task_with_retry(
                     "video",
                     "log",
                     f"[Phase 3] Fenjing {fenjing_id}: create_video_task returned None (attempt {attempt + 1}/{max_retries})",
-                    step="fenjing_prompts",
+                    step="step_video_generation",
                     project=project_name,
                 )
                 emit_event(
@@ -442,7 +442,7 @@ async def create_video_task_with_retry(
                     "video",
                     "fenjing_video_task_create_empty",
                     f"Fenjing {fenjing_id} create_video_task returned None",
-                    step="fenjing_video_task_create",
+                    step="step_video_generation",
                     project=project_name,
                     chapter=chapter_name,
                     fenjing_id=fenjing_id,
@@ -459,7 +459,7 @@ async def create_video_task_with_retry(
                     "video",
                     "log",
                     f"[Phase 3] Fenjing {fenjing_id}: Retryable error (attempt {attempt + 1}/{max_retries}): {e}",
-                    step="fenjing_prompts",
+                    step="step_video_generation",
                     project=project_name,
                 )
                 await asyncio.sleep(2 * (attempt + 1))
@@ -469,7 +469,7 @@ async def create_video_task_with_retry(
                     "video",
                     "log",
                     f"[Phase 3] Fenjing {fenjing_id}: Failed to create video task after {attempt + 1} attempts: {e}",
-                    step="fenjing_prompts",
+                    step="step_video_generation",
                     project=project_name,
                 )
                 emit_event(
@@ -477,7 +477,7 @@ async def create_video_task_with_retry(
                     "video",
                     "fenjing_video_task_create_error",
                     f"Fenjing {fenjing_id} create task failed: {e}",
-                    step="fenjing_video_task_create",
+                    step="step_video_generation",
                     project=project_name,
                     chapter=chapter_name,
                     fenjing_id=fenjing_id,
@@ -488,7 +488,7 @@ async def create_video_task_with_retry(
                     "video",
                     "flow_error",
                     f"Fenjing {fenjing_id} 视频任务创建重试超限",
-                    step="fenjing_video_task_create",
+                    step="step_video_generation",
                     project=project_name,
                     chapter=chapter_name,
                     fenjing_id=fenjing_id,
@@ -532,7 +532,7 @@ async def process_single_video_independent(
         "video",
         "log",
         f"[Phase 3] Fenjing {fenjing_id}: Starting video processing, Model={model_ep}, Duration={final_duration:.2f}s (Audio+0.3s: {audio_duration:.2f}s, Min: {min_duration}s)",
-        step="fenjing_prompts",
+        step="step_video_generation",
         project=project_name,
     )
     emit_event(
@@ -540,7 +540,7 @@ async def process_single_video_independent(
         "video",
         "fenjing_video_start",
         f"Fenjing {fenjing_id} start video processing",
-        step="fenjing_video",
+        step="step_video_generation",
         project=project_name,
         chapter=chapter_name,
         fenjing_id=fenjing_id,
@@ -558,7 +558,7 @@ async def process_single_video_independent(
             "video",
             "log",
             f"[Phase 3] Fenjing {fenjing_id}: Creating video task (retry {retry_count + 1}/{max_retries})",
-            step="fenjing_prompts",
+            step="step_video_generation",
             project=project_name,
         )
         
@@ -581,7 +581,7 @@ async def process_single_video_independent(
                 "video",
                 "log",
                 f"[Phase 3] Fenjing {fenjing_id}: Failed to create video task after retries",
-                step="fenjing_prompts",
+                step="step_video_generation",
                 project=project_name,
             )
             emit_event(
@@ -589,7 +589,7 @@ async def process_single_video_independent(
                 "video",
                 "fenjing_video_task_create_failed",
                 f"Fenjing {fenjing_id} failed to create video task",
-                step="fenjing_video_task_create",
+                step="step_video_generation",
                 project=project_name,
                 chapter=chapter_name,
                 fenjing_id=fenjing_id,
@@ -600,7 +600,7 @@ async def process_single_video_independent(
                     "video",
                     "log",
                     f"[Phase 3] Fenjing {fenjing_id}: Retrying video task creation...",
-                    step="fenjing_prompts",
+                    step="step_video_generation",
                     project=project_name,
                 )
                 continue
@@ -610,7 +610,7 @@ async def process_single_video_independent(
                     "video",
                     "flow_error",
                     f"Fenjing {fenjing_id} 视频任务创建重试超限",
-                    step="fenjing_video_task_create",
+                    step="step_video_generation",
                     project=project_name,
                     chapter=chapter_name,
                     fenjing_id=fenjing_id,
@@ -623,7 +623,7 @@ async def process_single_video_independent(
             "video",
             "log",
             f"[Phase 4] Fenjing {fenjing_id}: Waiting 20s before polling, TaskID={task_id}",
-            step="fenjing_prompts",
+            step="step_video_generation",
             project=project_name,
         )
         emit_event(
@@ -631,7 +631,7 @@ async def process_single_video_independent(
             "video",
             "fenjing_video_polling_wait",
             f"Fenjing {fenjing_id} wait before polling",
-            step="fenjing_video_polling",
+            step="step_video_generation",
             project=project_name,
             chapter=chapter_name,
             fenjing_id=fenjing_id,
@@ -648,7 +648,7 @@ async def process_single_video_independent(
                         "video",
                         "log",
                         f"[Phase 4] Fenjing {fenjing_id}: Poll returned None, retrying (poll {poll_count + 1}/{max_polls_per_retry})",
-                        step="fenjing_prompts",
+                        step="step_video_generation",
                         project=project_name,
                     )
                     await asyncio.sleep(poll_interval)
@@ -662,7 +662,7 @@ async def process_single_video_independent(
                         "video",
                         "log",
                         f"[Phase 4] Fenjing {fenjing_id}: Video generation succeeded, URL={video_url}",
-                        step="fenjing_prompts",
+                        step="step_video_generation",
                         project=project_name,
                     )
                     emit_event(
@@ -670,7 +670,7 @@ async def process_single_video_independent(
                         "video",
                         "fenjing_video_succeeded",
                         f"Fenjing {fenjing_id} video generation succeeded",
-                        step="fenjing_video_polling",
+                        step="step_video_generation",
                         project=project_name,
                         chapter=chapter_name,
                         fenjing_id=fenjing_id,
@@ -683,7 +683,7 @@ async def process_single_video_independent(
                         "video",
                         "log",
                         f"[Phase 4] Fenjing {fenjing_id}: Video generation failed, result={result}",
-                        step="fenjing_prompts",
+                        step="step_video_generation",
                         project=project_name,
                     )
                     emit_event(
@@ -691,7 +691,7 @@ async def process_single_video_independent(
                         "video",
                         "fenjing_video_failed",
                         f"Fenjing {fenjing_id} video generation failed",
-                        step="fenjing_video_polling",
+                        step="step_video_generation",
                         project=project_name,
                         chapter=chapter_name,
                         fenjing_id=fenjing_id,
@@ -703,7 +703,7 @@ async def process_single_video_independent(
                             "video",
                             "log",
                             f"[Phase 4] Fenjing {fenjing_id}: Retrying video task creation...",
-                            step="fenjing_prompts",
+                            step="step_video_generation",
                             project=project_name,
                         )
                         break
@@ -713,7 +713,7 @@ async def process_single_video_independent(
                             "video",
                             "flow_error",
                             f"Fenjing {fenjing_id} 视频生成重试超限",
-                            step="fenjing_video_polling",
+                            step="step_video_generation",
                             project=project_name,
                             chapter=chapter_name,
                             fenjing_id=fenjing_id,
@@ -726,7 +726,7 @@ async def process_single_video_independent(
                         "video",
                         "log",
                         f"[Phase 4] Fenjing {fenjing_id}: Video task cancelled",
-                        step="fenjing_prompts",
+                        step="step_video_generation",
                         project=project_name,
                     )
                     emit_event(
@@ -734,7 +734,7 @@ async def process_single_video_independent(
                         "video",
                         "fenjing_video_cancelled",
                         f"Fenjing {fenjing_id} video task cancelled",
-                        step="fenjing_video_polling",
+                        step="step_video_generation",
                         project=project_name,
                         chapter=chapter_name,
                         fenjing_id=fenjing_id,
@@ -746,7 +746,7 @@ async def process_single_video_independent(
                             "video",
                             "log",
                             f"[Phase 4] Fenjing {fenjing_id}: Retrying video task creation...",
-                            step="fenjing_prompts",
+                            step="step_video_generation",
                             project=project_name,
                         )
                         break
@@ -756,7 +756,7 @@ async def process_single_video_independent(
                             "video",
                             "flow_error",
                             f"Fenjing {fenjing_id} 视频生成重试超限",
-                            step="fenjing_video_polling",
+                            step="step_video_generation",
                             project=project_name,
                             chapter=chapter_name,
                             fenjing_id=fenjing_id,
@@ -769,7 +769,7 @@ async def process_single_video_independent(
                         "video",
                         "log",
                         f"[Phase 4] Fenjing {fenjing_id}: Status={status}, polling... (poll {poll_count + 1}/{max_polls_per_retry})",
-                        step="fenjing_prompts",
+                        step="step_video_generation",
                         project=project_name,
                     )
                     
@@ -780,7 +780,7 @@ async def process_single_video_independent(
                     "video",
                     "log",
                     f"[Phase 4] Fenjing {fenjing_id}: Exception during polling (poll {poll_count + 1}/{max_polls_per_retry}): {e}",
-                    step="fenjing_prompts",
+                    step="step_video_generation",
                     project=project_name,
                 )
                 emit_event(
@@ -788,7 +788,7 @@ async def process_single_video_independent(
                     "video",
                     "fenjing_video_polling_error",
                     f"Fenjing {fenjing_id} polling error: {e}",
-                    step="fenjing_video_polling",
+                    step="step_video_generation",
                     project=project_name,
                     chapter=chapter_name,
                     fenjing_id=fenjing_id,
@@ -807,7 +807,7 @@ async def process_single_video_independent(
                 "video",
                 "log",
                 f"[Phase 4] Fenjing {fenjing_id}: Video task still running after {max_polls_per_retry * poll_interval}s, retrying...",
-                step="fenjing_prompts",
+                step="step_video_generation",
                 project=project_name,
             )
             continue
@@ -817,7 +817,7 @@ async def process_single_video_independent(
                 "video",
                 "log",
                 f"[Phase 4] Fenjing {fenjing_id}: Video task timed out after {max_retries} retries",
-                step="fenjing_prompts",
+                step="step_video_generation",
                 project=project_name,
             )
             emit_event(
@@ -825,7 +825,7 @@ async def process_single_video_independent(
                 "video",
                 "flow_error",
                 f"Fenjing {fenjing_id} 视频轮询重试超限",
-                step="fenjing_video_polling",
+                step="step_video_generation",
                 project=project_name,
                 chapter=chapter_name,
                 fenjing_id=fenjing_id,
@@ -839,7 +839,7 @@ async def process_single_video_independent(
             "video",
             "log",
             f"[Phase 4] Fenjing {fenjing_id}: Video task failed to complete",
-            step="fenjing_prompts",
+            step="step_video_generation",
             project=project_name,
         )
         emit_event(
@@ -847,7 +847,7 @@ async def process_single_video_independent(
             "video",
             "fenjing_video_no_url",
             f"Fenjing {fenjing_id} video task completed without url",
-            step="fenjing_video_polling",
+            step="step_video_generation",
             project=project_name,
             chapter=chapter_name,
             fenjing_id=fenjing_id,
@@ -857,7 +857,7 @@ async def process_single_video_independent(
             "video",
             "flow_error",
             f"Fenjing {fenjing_id} 视频生成重试超限",
-            step="fenjing_video_polling",
+            step="step_video_generation",
             project=project_name,
             chapter=chapter_name,
             fenjing_id=fenjing_id,
@@ -870,7 +870,7 @@ async def process_single_video_independent(
         "video",
         "log",
         f"[Phase 5] Fenjing {fenjing_id}: Downloading video from {video_url}",
-        step="fenjing_prompts",
+        step="step_video_generation",
         project=project_name,
     )
     emit_event(
@@ -878,7 +878,7 @@ async def process_single_video_independent(
         "video",
         "fenjing_video_download_start",
         f"Fenjing {fenjing_id} start download",
-        step="fenjing_video_download",
+        step="step_video_generation",
         project=project_name,
         chapter=chapter_name,
         fenjing_id=fenjing_id,
@@ -894,7 +894,7 @@ async def process_single_video_independent(
         "video",
         "log",
         f"[Phase 5] Fenjing {fenjing_id}: Target save path: {save_path}",
-        step="fenjing_prompts",
+        step="step_video_generation",
         project=project_name,
     )
     
@@ -907,7 +907,7 @@ async def process_single_video_independent(
                 "video",
                 "log",
                 f"[Phase 5] Fenjing {fenjing_id}: Video downloaded successfully to {save_path}",
-                step="fenjing_prompts",
+                step="step_video_generation",
                 project=project_name,
             )
             emit_event(
@@ -915,7 +915,7 @@ async def process_single_video_independent(
                 "video",
                 "fenjing_video_downloaded",
                 f"Fenjing {fenjing_id} downloaded",
-                step="fenjing_video_download",
+                step="step_video_generation",
                 project=project_name,
                 chapter=chapter_name,
                 fenjing_id=fenjing_id,
@@ -937,7 +937,7 @@ async def process_single_video_independent(
                 "video",
                 "log",
                 f"[Phase 5] Fenjing {fenjing_id}: Starting upload to TOS, bucket={runtime_config.TOS_BUCKET}, key={tos_key}",
-                step="fenjing_prompts",
+                step="step_video_upload",
                 project=project_name,
             )
             emit_event(
@@ -945,7 +945,7 @@ async def process_single_video_independent(
                 "video",
                 "fenjing_video_upload_start",
                 f"Fenjing {fenjing_id} upload to TOS start",
-                step="fenjing_video_upload",
+                step="step_video_upload",
                 project=project_name,
                 chapter=chapter_name,
                 fenjing_id=fenjing_id,
@@ -958,7 +958,7 @@ async def process_single_video_independent(
                     "video",
                     "log",
                     f"[Phase 5] Fenjing {fenjing_id}: Video uploaded to TOS successfully: {uploaded_url}",
-                    step="fenjing_prompts",
+                    step="step_video_upload",
                     project=project_name,
                 )
                 emit_event(
@@ -966,7 +966,7 @@ async def process_single_video_independent(
                     "video",
                     "fenjing_video_uploaded",
                     f"Fenjing {fenjing_id} uploaded to TOS",
-                    step="fenjing_video_upload",
+                    step="step_video_upload",
                     project=project_name,
                     chapter=chapter_name,
                     fenjing_id=fenjing_id,
@@ -979,7 +979,7 @@ async def process_single_video_independent(
                     "video",
                     "log",
                     f"[Phase 5] Fenjing {fenjing_id}: Failed to upload video to TOS, key={tos_key}",
-                    step="fenjing_prompts",
+                    step="step_video_upload",
                     project=project_name,
                 )
                 emit_event(
@@ -987,7 +987,7 @@ async def process_single_video_independent(
                     "video",
                     "fenjing_video_upload_error",
                     f"Fenjing {fenjing_id} upload to TOS failed",
-                    step="fenjing_video_upload",
+                    step="step_video_upload",
                     project=project_name,
                     chapter=chapter_name,
                     fenjing_id=fenjing_id,
@@ -1000,7 +1000,7 @@ async def process_single_video_independent(
                 "video",
                 "log",
                 f"[Phase 5] Fenjing {fenjing_id}: Download function returned False",
-                step="fenjing_prompts",
+                step="step_video_generation",
                 project=project_name,
             )
             emit_event(
@@ -1008,7 +1008,7 @@ async def process_single_video_independent(
                 "video",
                 "fenjing_video_download_error",
                 f"Fenjing {fenjing_id} download failed",
-                step="fenjing_video_download",
+                step="step_video_generation",
                 project=project_name,
                 chapter=chapter_name,
                 fenjing_id=fenjing_id,
@@ -1020,7 +1020,7 @@ async def process_single_video_independent(
             "video",
             "log",
             f"[Phase 5] Fenjing {fenjing_id}: Exception during download/upload: {e}",
-            step="fenjing_prompts",
+            step="step_video_generation",
             project=project_name,
         )
         emit_event(
@@ -1028,7 +1028,7 @@ async def process_single_video_independent(
             "video",
             "fenjing_video_download_upload_error",
             f"Fenjing {fenjing_id} download/upload exception: {e}",
-            step="fenjing_video_download",
+            step="step_video_generation",
             project=project_name,
             chapter=chapter_name,
             fenjing_id=fenjing_id,
@@ -1061,7 +1061,7 @@ async def submit_video_tasks_batch(
         "video",
         "log",
         f"[Phase 3] Starting video task submission for {len(prompts)} items, QPS={qps}",
-        step="general",
+        step="step_video_generation",
         project=project_name,
     )
     emit_event(
@@ -1069,7 +1069,7 @@ async def submit_video_tasks_batch(
         "video",
         "video_task_queue_start",
         "video task submission queue start",
-        step="video_task_queue",
+        step="step_video_generation",
         project=project_name,
         chapter=chapter_name,
         data={"total": len(prompts), "qps": qps},
@@ -1090,7 +1090,7 @@ async def submit_video_tasks_batch(
                 "video",
                 "log",
                 f"[Phase 3] Skipping item with missing fenjing_id or prompt: {item}",
-                step="fenjing_prompts",
+                step="step_video_generation",
                 project=project_name,
             )
             emit_event(
@@ -1098,7 +1098,7 @@ async def submit_video_tasks_batch(
                 "video",
                 "video_task_queue_skip",
                 "video task submission skipped due to missing fields",
-                step="video_task_queue",
+                step="step_video_generation",
                 project=project_name,
                 chapter=chapter_name,
                 fenjing_id=str(fenjing_id) if fenjing_id else "",
@@ -1124,7 +1124,7 @@ async def submit_video_tasks_batch(
                 "video",
                 "log",
                 f"[Phase 3] Fenjing {fenjing_id}: Failed to get presigned URL for image: {image_key}",
-                step="fenjing_prompts",
+                step="step_video_generation",
                 project=project_name,
             )
             emit_event(
@@ -1132,7 +1132,7 @@ async def submit_video_tasks_batch(
                 "video",
                 "video_task_queue_image_missing",
                 f"Fenjing {fenjing_id} image presign failed",
-                step="video_task_queue",
+                step="step_video_generation",
                 project=project_name,
                 chapter=chapter_name,
                 fenjing_id=fenjing_id,
@@ -1162,7 +1162,7 @@ async def submit_video_tasks_batch(
             "video",
             "log",
             f"[Phase 3] Fenjing {fenjing_id}: Task submitted ({submitted_count}/{len(prompts)})",
-            step="fenjing_prompts",
+            step="step_video_generation",
             project=project_name,
         )
         emit_event(
@@ -1170,7 +1170,7 @@ async def submit_video_tasks_batch(
             "video",
             "video_task_submitted",
             f"Fenjing {fenjing_id} task submitted",
-            step="video_task_queue",
+            step="step_video_generation",
             project=project_name,
             chapter=chapter_name,
             fenjing_id=fenjing_id,
@@ -1181,7 +1181,7 @@ async def submit_video_tasks_batch(
             "video",
             "video_task_throttle_sleep",
             "video task submission throttling",
-            step="video_task_queue",
+            step="step_video_generation",
             project=project_name,
             chapter=chapter_name,
             fenjing_id=fenjing_id,
@@ -1194,7 +1194,7 @@ async def submit_video_tasks_batch(
         "video",
         "log",
         f"[Phase 3] All {submitted_count} video tasks submitted, each task will process independently",
-        step="general",
+        step="step_video_generation",
         project=project_name,
     )
     emit_event(
@@ -1202,7 +1202,7 @@ async def submit_video_tasks_batch(
         "video",
         "video_task_queue_complete",
         "video task submission queue complete",
-        step="video_task_queue",
+        step="step_video_generation",
         project=project_name,
         chapter=chapter_name,
         data={"submitted": submitted_count, "total": len(prompts)},
@@ -1225,7 +1225,7 @@ async def run_video_workflow(
         "video",
         "flow_start",
         "Video workflow started",
-        step="start",
+        step="step_prepare",
         project=project_name,
         chapter=chapter_name,
     )
@@ -1240,8 +1240,8 @@ async def run_video_workflow(
         "video",
         "phase_start",
         "phase1_video_prompts",
-        step="phase1_video_prompts",
-        phase="phase1_video_prompts",
+        step="step_video_prompts",
+        phase="step_video_prompts",
         project=project_name,
         chapter=chapter_name,
     )
@@ -1250,8 +1250,8 @@ async def run_video_workflow(
         "video",
         "phase_start",
         "PHASE 1: Get Audio Durations & Update Fenjing Prompts",
-        step="phase1_video_prompts",
-        phase="phase1_video_prompts",
+        step="step_video_prompts",
+        phase="step_video_prompts",
         project=project_name,
         chapter=chapter_name,
     )
@@ -1264,7 +1264,7 @@ async def run_video_workflow(
         "video",
         "log",
         f"[Phase 1] Found {len(fenjing_prompts)} fenjing items, getting audio durations...",
-        step="fenjing_prompts",
+        step="step_video_prompts",
         project=project_name,
     )
     
@@ -1284,7 +1284,7 @@ async def run_video_workflow(
             "video",
             "log",
             f"[Phase 1] Fenjing {fenjing_id}: Audio duration={duration:.2f}s, Final duration={final_duration:.2f}s (added 0.3s)",
-            step="fenjing_prompts",
+            step="step_video_prompts",
             project=project_name,
         )
     
@@ -1298,7 +1298,7 @@ async def run_video_workflow(
         "video",
         "log",
         f"[Phase 1] Updated fenjing_prompts.jsonl with {len(updated_prompts)} items",
-        step="fenjing_prompts",
+        step="step_video_prompts",
         project=project_name,
     )
 
@@ -1312,8 +1312,8 @@ async def run_video_workflow(
         "video",
         "phase_complete",
         f"phase1_video_prompts completed: {len(updated_prompts)}",
-        step="phase1_video_prompts",
-        phase="phase1_video_prompts",
+        step="step_video_prompts",
+        phase="step_video_prompts",
         project=project_name,
         chapter=chapter_name,
         data={"count": len(updated_prompts)},
@@ -1336,8 +1336,8 @@ async def run_video_workflow(
         "video",
         "phase_start",
         "phase2_video_generation",
-        step="phase2_video_generation",
-        phase="phase2_video_generation",
+        step="step_video_generation",
+        phase="step_video_generation",
         project=project_name,
         chapter=chapter_name,
     )
@@ -1348,8 +1348,8 @@ async def run_video_workflow(
         "video",
         "step_progress",
         f"submitted video tasks: {len(tasks)}",
-        step="video_task_submit",
-        phase="phase2_video_generation",
+        step="step_video_generation",
+        phase="step_video_generation",
         project=project_name,
         chapter=chapter_name,
         data={"total": len(tasks)},
@@ -1364,8 +1364,8 @@ async def run_video_workflow(
         "video",
         "phase_complete",
         "phase2_video_generation completed",
-        step="phase2_video_generation",
-        phase="phase2_video_generation",
+        step="step_video_generation",
+        phase="step_video_generation",
         project=project_name,
         chapter=chapter_name,
         data={"success": success_count, "error": error_count, "total": len(results)},
@@ -1375,7 +1375,7 @@ async def run_video_workflow(
         "video",
         "log",
         f"Video task summary: Success={success_count}, Error={error_count}, Total={len(results)}",
-        step="general",
+        step="step_video_generation",
         project=project_name,
     )
 
@@ -1439,7 +1439,7 @@ async def run_video_workflow_multi(
         "video",
         "flow_start",
         "video workflow start",
-        step="start",
+        step="step_prepare",
         project=project_name,
     )
     if chapters:
@@ -1448,7 +1448,7 @@ async def run_video_workflow_multi(
             "video",
             "log",
             f"Found {len(chapters)} chapters for video workflow",
-            step="general",
+            step="step_prepare",
             project=project_name,
         )
     if not chapters:
@@ -1457,7 +1457,7 @@ async def run_video_workflow_multi(
             "video",
             "flow_error",
             "No storyboard chapter files found",
-            step="start",
+            step="step_prepare",
             project=project_name,
         )
         emit_event(
@@ -1465,7 +1465,7 @@ async def run_video_workflow_multi(
             "video",
             "log",
             f"No storyboard chapter files found.",
-            step="general",
+            step="step_prepare",
             project=project_name,
         )
         return
@@ -1504,7 +1504,7 @@ async def run_video_workflow_multi(
                 "video",
                 "log",
                 f"Fenjing prompts not found for {chapter_name}, prefix={assets_prefix.rstrip('/')}/storyboards/{chapter_name}/",
-                step="fenjing_prompts",
+                step="step_video_prompts",
                 project=project_name,
             )
             continue
@@ -1519,7 +1519,7 @@ async def run_video_workflow_multi(
         "video",
         "log",
         f"Prepared {len(chapter_entries)} chapters for video prompt generation, QPS={qps}",
-        step="general",
+        step="step_prepare",
         project=project_name,
     )
     if not chapter_entries:
@@ -1528,7 +1528,7 @@ async def run_video_workflow_multi(
             "video",
             "flow_error",
             "No chapters with fenjing_prompts.jsonl found",
-            step="prepare",
+            step="step_prepare",
             project=project_name,
         )
         emit_event(
@@ -1536,7 +1536,7 @@ async def run_video_workflow_multi(
             "video",
             "log",
             f"No chapters with fenjing_prompts.jsonl found.",
-            step="fenjing_prompts",
+            step="step_video_prompts",
             project=project_name,
         )
         return
@@ -1546,8 +1546,8 @@ async def run_video_workflow_multi(
         "video",
         "phase_complete",
         "prepare completed",
-        step="prepare",
-        phase="prepare",
+        step="step_prepare",
+        phase="step_prepare",
         project=project_name,
     )
 
@@ -1565,7 +1565,7 @@ async def run_video_workflow_multi(
                 "video",
                 "log",
                 f"[{entry['chapter_name']}] Video prompt generation failed: {result}",
-                step="general",
+                step="step_video_prompts",
                 project=project_name,
             )
             continue
@@ -1590,7 +1590,7 @@ async def run_video_workflow_multi(
                 "video",
                 "log",
                 f"Video workflow failed: {r}",
-                step="general",
+                step="step_video_generation",
                 project=project_name,
             )
 
@@ -1602,7 +1602,7 @@ async def run_video_workflow_multi(
             "video",
             "log",
             f"\nTask Summary: Success={success_count}, Error={error_count}, Total={len(results)}",
-            step="general",
+            step="step_video_generation",
             project=project_name,
         )
     
@@ -1611,8 +1611,8 @@ async def run_video_workflow_multi(
         "video",
         "phase_complete",
         "fenjing_video_upload completed",
-        step="fenjing_video_upload",
-        phase="fenjing_video_upload",
+        step="step_video_upload",
+        phase="step_video_upload",
         project=project_name,
     )
     
@@ -1622,7 +1622,7 @@ async def run_video_workflow_multi(
             "video",
             "flow_error",
             "Video Workflow Failed",
-            step="complete",
+            step="step_video_upload",
             project=project_name,
         )
     else:
@@ -1631,7 +1631,7 @@ async def run_video_workflow_multi(
             "video",
             "flow_complete",
             "Video Workflow Completed",
-            step="complete",
+            step="step_video_upload",
             project=project_name,
         )
 
@@ -1689,12 +1689,12 @@ async def run_video_prepare_prompts(
 
     emit_event(
         "INFO", "video", "flow_start", "video workflow start",
-        step="start", project=project_name,
+        step="step_prepare", project=project_name,
     )
     if not chapters:
         emit_event(
             "ERROR", "video", "flow_error", "No storyboard chapter files found",
-            step="start", project=project_name,
+            step="step_prepare", project=project_name,
         )
         return []
 
@@ -1724,7 +1724,7 @@ async def run_video_prepare_prompts(
             emit_event(
                 "WARN", "video", "log",
                 f"Fenjing prompts not found for {chapter_name_local}",
-                step="fenjing_prompts", project=project_name,
+                step="step_video_prompts", project=project_name,
             )
             continue
         chapter_entries.append({
@@ -1736,13 +1736,13 @@ async def run_video_prepare_prompts(
     if not chapter_entries:
         emit_event(
             "ERROR", "video", "flow_error", "No chapters with fenjing_prompts.jsonl found",
-            step="prepare", project=project_name,
+            step="step_prepare", project=project_name,
         )
         return []
 
     emit_event(
         "INFO", "video", "phase_complete", "prepare completed",
-        step="prepare", phase="prepare", project=project_name,
+        step="step_prepare", phase="step_prepare", project=project_name,
     )
 
     async def _build_prompts(ch_name: str, fp_path: Path, ch_dir: Path) -> Path:
@@ -1765,7 +1765,7 @@ async def run_video_prepare_prompts(
             emit_event(
                 "ERROR", "video", "log",
                 f"[{entry['chapter_name']}] Video prompt generation failed: {result}",
-                step="general", project=project_name,
+                step="step_video_prompts", project=project_name,
             )
             continue
         entry["video_prompts_path"] = result
@@ -1773,7 +1773,7 @@ async def run_video_prepare_prompts(
 
     emit_event(
         "INFO", "video", "phase_complete", "phase1_video_prompts completed",
-        step="phase1_video_prompts", phase="phase1_video_prompts", project=project_name,
+        step="step_video_prompts", phase="step_video_prompts", project=project_name,
         data={"count": len(result_entries)},
     )
     return result_entries
@@ -1813,13 +1813,13 @@ async def run_video_generate_only(
     if not chapter_entries:
         emit_event(
             "ERROR", "video", "flow_error", "No chapters with shipin_prompts.jsonl found for generate_videos",
-            step="phase2_video_generation", project=project_name,
+            step="step_video_generation", project=project_name,
         )
         return (0, 0)
 
     emit_event(
         "INFO", "video", "phase_start", "phase2_video_generation",
-        step="phase2_video_generation", phase="phase2_video_generation", project=project_name,
+        step="step_video_generation", phase="step_video_generation", project=project_name,
     )
 
     interval = 1.0 / qps if qps > 0 else 0
@@ -1851,7 +1851,7 @@ async def run_video_generate_only(
 
     emit_event(
         "INFO", "video", "phase_complete", "phase2_video_generation completed",
-        step="phase2_video_generation", phase="phase2_video_generation", project=project_name,
+        step="step_video_generation", phase="step_video_generation", project=project_name,
         data={"success": success_count, "error": error_count, "total": len(results)},
     )
     return (success_count, error_count)
@@ -1882,13 +1882,13 @@ async def run_video_upload_only(
         emit_event(
             "ERROR", "video", "flow_error",
             f"No video directory found for upload: {video_base} (please run generate_videos first)",
-            step="fenjing_video_upload", project=project_name,
+            step="step_video_upload", project=project_name,
         )
         return (0, 0)
 
     emit_event(
         "INFO", "video", "phase_start", "fenjing_video_upload",
-        step="fenjing_video_upload", phase="fenjing_video_upload", project=project_name,
+        step="step_video_upload", phase="step_video_upload", project=project_name,
     )
 
     for chapter_dir in sorted(video_base.iterdir()):
@@ -1901,7 +1901,7 @@ async def run_video_upload_only(
             emit_event(
                 "INFO", "video", "fenjing_video_upload_start",
                 f"Uploading {mp4.name}",
-                step="fenjing_video_upload", project=project_name,
+                step="step_video_upload", project=project_name,
                 chapter=chapter_name, data={"key": tos_key, "path": str(mp4)},
             )
             uploaded_url = tos.upload_file(runtime_config.TOS_BUCKET, tos_key, mp4)
@@ -1911,7 +1911,7 @@ async def run_video_upload_only(
                 emit_event(
                     "INFO", "video", "fenjing_video_uploaded",
                     f"Uploaded {mp4.name}",
-                    step="fenjing_video_upload", project=project_name,
+                    step="step_video_upload", project=project_name,
                     chapter=chapter_name, fenjing_id=fenjing_id,
                     data={"key": tos_key, "url": uploaded_url},
                 )
@@ -1920,13 +1920,13 @@ async def run_video_upload_only(
                 emit_event(
                     "ERROR", "video", "fenjing_video_upload_error",
                     f"Failed to upload {mp4.name}",
-                    step="fenjing_video_upload", project=project_name,
+                    step="step_video_upload", project=project_name,
                     chapter=chapter_name, data={"key": tos_key},
                 )
 
     emit_event(
         "INFO", "video", "phase_complete", "fenjing_video_upload completed",
-        step="fenjing_video_upload", phase="fenjing_video_upload", project=project_name,
+        step="step_video_upload", phase="step_video_upload", project=project_name,
         data={"success": success_count, "error": error_count},
     )
     return (success_count, error_count)
