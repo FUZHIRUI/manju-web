@@ -233,6 +233,17 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
                 "cloth_images",
                 "cloth_changed",
                 "cloth_changed_images",
+                # 新 step_ 前缀命名
+                "step_download",
+                "step_character_prompts",
+                "step_location_prompts",
+                "step_fenjing_prompts",
+                "step_character_images",
+                "step_location_images",
+                "step_cloth_images",
+                "step_cloth_changed",
+                "step_tts",
+                "step_upload",
             }
             if phase_tokens and any(p not in allowed_phases for p in phase_tokens):
                 send_json(handler, HTTPStatus.BAD_REQUEST, {"error": "invalid_phase"})

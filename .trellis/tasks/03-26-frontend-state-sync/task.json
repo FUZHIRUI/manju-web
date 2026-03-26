@@ -3,18 +3,18 @@
   "name": "frontend-state-sync",
   "title": "前端状态同步：FLOW_TREE_CONFIG 更新、Bug 修复",
   "description": "",
-  "status": "planning",
-  "dev_type": null,
-  "scope": null,
+  "status": "completed",
+  "dev_type": "fullstack",
+  "scope": "frontend/backend",
   "priority": "P2",
   "creator": "claude-agent",
   "assignee": "claude-agent",
   "createdAt": "2026-03-26",
-  "completedAt": null,
-  "branch": null,
+  "completedAt": "2026-03-26",
+  "branch": "main",
   "base_branch": "main",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 4,
   "next_action": [
     {"phase": 1, "action": "implement"},
     {"phase": 2, "action": "check"},
@@ -23,7 +23,16 @@
   ],
   "commit": null,
   "pr_url": null,
-  "subtasks": [],
-  "relatedFiles": [],
-  "notes": ""
+  "subtasks": [
+    {"name": "FLOW_TREE_CONFIG step id 迁移", "status": "completed"},
+    {"name": "isAssetGenerating bug 修复", "status": "completed"},
+    {"name": "API phase 参数更新", "status": "completed"},
+    {"name": "死代码清理", "status": "completed"},
+    {"name": "后端 phase 白名单同步", "status": "completed"}
+  ],
+  "relatedFiles": [
+    "frontend/app.js",
+    "backend/handlers/job_handler.py"
+  ],
+  "notes": "所有改动已完成，详见 summary.md"
 }

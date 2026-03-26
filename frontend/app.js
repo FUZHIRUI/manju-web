@@ -346,8 +346,8 @@ function openAutoStoryboardPhaseDialog(phase) {
     const title = document.createElement("div");
     title.className = "modal-title";
     // 支持新的 step 命名和旧的 phase 命名
-    const isStep2 = phase === "step2" || phase === "phase2";
-    const isStep3 = phase === "step3_upload";
+    const isStep2 = phase === "step_storyboard" || phase === "step2" || phase === "phase2";
+    const isStep3 = phase === "step_upload" || phase === "step3_upload";
     title.textContent = isStep2 ? "运行步骤 2" : (isStep3 ? "上传资产" : "运行步骤 1");
     const fields = isStep2
       ? ["per_chapter_shots"]
@@ -869,27 +869,27 @@ function appendVisualAudioPhaseButtons(job, container) {
     {
       label: "第一步：提示词",
       phases: ["build_prompts"],
-      checkSteps: ["character_prompts", "location_prompts", "fenjing_prompts"]
+      checkSteps: ["step_character_prompts", "step_location_prompts", "step_fenjing_prompts"]
     },
     {
       label: "第二步：生成",
       phases: ["generate_images"],
-      checkSteps: ["character_images", "location_images"]
+      checkSteps: ["step_character_images", "step_location_images"]
     },
     {
       label: "第二步：TTS语音",
       phases: ["generate_tts"],
-      checkSteps: ["tts"]
+      checkSteps: ["step_tts"]
     },
     {
       label: "第三步：上传",
       phases: ["upload_assets"],
-      checkSteps: ["upload_assets"]
+      checkSteps: ["step_upload"]
     },
     {
       label: "第四步：换装",
       phases: ["cloth_images", "cloth_changed"],
-      checkSteps: ["cloth_images", "cloth_changed"]
+      checkSteps: ["step_cloth_images", "step_cloth_changed"]
     }
   ];
 
@@ -911,7 +911,7 @@ function appendVisualAudioPhaseButtons(job, container) {
 
   stepStates.forEach((item, idx) => {
     const { config, completed, failed, running } = item;
-    const isPrompt = config.phases[0] === "build_prompts";
+    const isPrompt = config.phases[0] === "build_prompts" || config.phases[0] === "step_character_prompts";
     const stepDisabled = disabled || completed || running;
     const label = completed ? `${config.label} ✓` : config.label;
     let actionLabel = "执行";
@@ -999,9 +999,9 @@ function appendVideoPhaseButtons(job, container) {
   const videoFlow = flowState?.video;
 
   const phases = [
-    { label: "第一步：视频提示词生成", phase: "prepare_prompts", stepKey: "phase1_video_prompts" },
-    { label: "第二步：视频生成", phase: "generate_videos", stepKey: "phase2_video_generation" },
-    { label: "第三步：上传", phase: "upload_videos", stepKey: "fenjing_video_upload" },
+    { label: "第一步：视频提示词生成", phase: "prepare_prompts", stepKey: "step_video_prompts" },
+    { label: "第二步：视频生成", phase: "generate_videos", stepKey: "step_video_generation" },
+    { label: "第三步：上传", phase: "upload_videos", stepKey: "step_video_upload" },
   ];
 
   for (const p of phases) {
@@ -1033,22 +1033,22 @@ function resolveVisualAudioRetryPhase(errorEvent) {
   if (!step) {
     return "";
   }
-  if (step === "character" || step === "character_prompts" || step === "location_prompts" || step === "fenjing_prompts" || step === "build_prompts") {
+  if (step === "step_character_prompts" || step === "step_location_prompts" || step === "step_fenjing_prompts" || step === "build_prompts") {
     return "build_prompts";
   }
-  if (step === "character_images" || step === "generate_location_images" || step === "location_images" || step === "generate_images") {
+  if (step === "step_character_images" || step === "step_location_images" || step === "generate_images") {
     return "generate_images";
   }
-  if (step === "tts" || step === "generate_tts") {
+  if (step === "step_tts" || step === "generate_tts") {
     return "generate_tts";
   }
-  if (step === "cloth_changed") {
+  if (step === "step_cloth_changed") {
     return "cloth_changed";
   }
-  if (step === "validate_cloth" || step === "generate_cloth" || step === "phase_cloth_generation" || step === "cloth" || step === "cloth_images") {
+  if (step === "step_cloth_images" || step === "cloth_images") {
     return "cloth_images";
   }
-  if (step === "upload_assets") {
+  if (step === "step_upload" || step === "upload_assets") {
     return "upload_assets";
   }
   return "";
@@ -1144,11 +1144,9 @@ function updateTreeActions(job, container) {
       const failure = config ? resolveTreeFailure(events, config) : null;
       const failedStep = failure ? failure.stepId : "";
       const failedStepMappings = {
-        "phase1": { label: "步骤 1", newStep: "step1" },
-        "step1": { label: "步骤 1", newStep: "step1" },
-        "phase2": { label: "步骤 2", newStep: "step2" },
-        "step2": { label: "步骤 2", newStep: "step2" },
-        "step3_upload": { label: "上传资产", newStep: "step3_upload" }
+        "step_extract": { label: "步骤 1", newStep: "step_extract" },
+        "step_storyboard": { label: "步骤 2", newStep: "step_storyboard" },
+        "step_upload": { label: "上传资产", newStep: "step_upload" }
       };
       const mapping = failedStepMappings[failedStep];
       if (mapping) {
@@ -1200,13 +1198,13 @@ function parseAutoStoryboardProgressFromEvents(events) {
     return `正在上传资产 (${count}个文件)`;
   }
 
-  const phase2Complete = findLastEvent(events, (e) => e.event === "phase_complete" && e.phase === "phase2");
+  const phase2Complete = findLastEvent(events, (e) => e.event === "phase_complete" && (e.phase === "step_storyboard" || e.phase === "phase2"));
   if (phase2Complete) {
     return "阶段 2 完成：正在上传资产";
   }
 
-  const phase2Start = findLastEvent(events, (e) => e.event === "phase_start" && e.phase === "phase2");
-  const phase2BatchEvents = events.filter((e) => e.event === "step_progress" && e.step === "phase2_batch_progress" && e.data && e.data.status === "completed");
+  const phase2Start = findLastEvent(events, (e) => e.event === "phase_start" && (e.phase === "step_storyboard" || e.phase === "phase2"));
+  const phase2BatchEvents = events.filter((e) => e.event === "step_progress" && (e.step === "step_storyboard" || e.step === "phase2_batch_progress") && e.data && e.data.status === "completed");
   if (phase2Start || phase2BatchEvents.length > 0) {
     if (phase2BatchEvents.length > 0) {
       return `阶段 2：正在生成分镜 (${phase2BatchEvents.length}批次完成)`;
@@ -1214,17 +1212,17 @@ function parseAutoStoryboardProgressFromEvents(events) {
     return "阶段 2：正在生成分镜";
   }
 
-  const phase1Complete = findLastEvent(events, (e) => e.event === "phase_complete" && e.phase === "phase1");
+  const phase1Complete = findLastEvent(events, (e) => e.event === "phase_complete" && (e.phase === "step_extract" || e.phase === "phase1"));
   if (phase1Complete) {
     return "阶段 1 完成：等待你的操作，进入阶段 2";
   }
 
-  const phase1Api = findLastEvent(events, (e) => e.event === "step_progress" && e.step === "phase1_api_call");
+  const phase1Api = findLastEvent(events, (e) => e.event === "step_progress" && (e.step === "step_extract" || e.step === "phase1_api_call"));
   if (phase1Api) {
     return "阶段 1：正在调用 API";
   }
 
-  const phase1Start = findLastEvent(events, (e) => e.event === "phase_start" && e.phase === "phase1");
+  const phase1Start = findLastEvent(events, (e) => e.event === "phase_start" && (e.phase === "step_extract" || e.phase === "phase1"));
   if (phase1Start) {
     return "阶段 1：提取人物、摘要和地点";
   }
@@ -1867,31 +1865,31 @@ const FLOW_TREE_CONFIG = {
     title: "剧本拆解进度",
     steps: [
       {
-        id: "step1",
+        id: "step_extract",
         label: "步骤 1",
         desc: "提取人物、摘要和地点",
         startEvents: [
-          { event: "phase_start", phase: "phase1" },
-          { event: "step_progress", step: "phase1_api_call" }
+          { event: "phase_start", phase: "step_extract" },
+          { event: "step_progress", step: "step_extract" }
         ],
-        completeEvents: [{ event: "phase_complete", phase: "phase1" }],
+        completeEvents: [{ event: "phase_complete", phase: "step_extract" }],
         fallbackStart: ["阶段 1:", "步骤 1:"],
         fallbackComplete: ["阶段 1 完成", "步骤 1 完成"]
       },
       {
-        id: "step2",
+        id: "step_storyboard",
         label: "步骤 2",
         desc: "生成分镜",
         startEvents: [
-          { event: "phase_start", phase: "phase2" },
-          { event: "step_progress", step: "phase2_batch_progress" }
+          { event: "phase_start", phase: "step_storyboard" },
+          { event: "step_progress", step: "step_storyboard" }
         ],
-        completeEvents: [{ event: "phase_complete", phase: "phase2" }],
+        completeEvents: [{ event: "phase_complete", phase: "step_storyboard" }],
         fallbackStart: ["阶段 2:", "步骤 2:"],
         fallbackComplete: ["并行生成完成", "步骤 2 完成"]
       },
       {
-        id: "step3_upload",
+        id: "step_upload",
         label: "上传资产",
         desc: "上传到 TOS",
         startEvents: [{ event: "upload_start" }, { event: "upload_progress" }],
@@ -1906,7 +1904,7 @@ const FLOW_TREE_CONFIG = {
     title: "角色与素材生成",
     steps: [
       {
-        id: "download_assets",
+        id: "step_download",
         label: "准备资产",
         desc: "下载基础素材",
         startEvents: [{ event: "flow_start" }],
@@ -1916,55 +1914,54 @@ const FLOW_TREE_CONFIG = {
         errorPatterns: ["download", "Failed to download", "download_assets"]
       },
       {
-        id: "build_prompts",
+        id: "step_prompts",
         label: "构建提示词",
         desc: "角色/地点/分镜提示词",
         startEvents: [
-          { event: "step_progress", step: "character_prompts" },
-          { event: "step_progress", step: "location_prompts" },
-          { event: "step_progress", step: "fenjing_prompts" }
+          { event: "step_progress", step: "step_character_prompts" },
+          { event: "step_progress", step: "step_location_prompts" },
+          { event: "step_progress", step: "step_fenjing_prompts" }
         ],
         completeEvents: [
-          { event: "phase_complete", step: "character_prompts" },
-          { event: "phase_complete", step: "location_prompts" },
-          { event: "phase_complete", step: "fenjing_prompts" }
+          { event: "phase_complete", step: "step_character_prompts" },
+          { event: "phase_complete", step: "step_location_prompts" },
+          { event: "phase_complete", step: "step_fenjing_prompts" }
         ],
         fallbackStart: ["Building Character Prompts", "Building Location Prompts", "Building Fenjing Prompts"],
         fallbackComplete: [],
         errorPatterns: ["prompt"]
       },
       {
-        id: "generate_images",
+        id: "step_images",
         label: "生成图片",
         desc: "角色形象图生成",
         startEvents: [
-          { event: "step_progress", step: "character_images" },
-          { event: "step_progress", step: "location_images" },
-          { event: "phase_start", phase: "phase_cloth_generation" },
-          { event: "step_progress", step: "validate_cloth" },
-          { event: "step_progress", step: "generate_cloth" }
+          { event: "step_progress", step: "step_character_images" },
+          { event: "step_progress", step: "step_location_images" },
+          { event: "phase_start", phase: "step_cloth_images" },
+          { event: "step_progress", step: "step_cloth_images" }
         ],
         completeEvents: [
-          { event: "phase_complete", step: "character_images" },
-          { event: "phase_complete", step: "location_images" },
-          { event: "phase_complete", phase: "phase_cloth_generation" }
+          { event: "phase_complete", step: "step_character_images" },
+          { event: "phase_complete", step: "step_location_images" },
+          { event: "phase_complete", phase: "step_cloth_images" }
         ],
         fallbackStart: ["Generating Character Images"],
         fallbackComplete: [],
         errorPatterns: ["image"]
       },
       {
-        id: "generate_tts",
+        id: "step_tts",
         label: "生成语音",
         desc: "TTS 语音生成",
-        startEvents: [{ event: "step_progress", step: "tts" }],
-        completeEvents: [{ event: "phase_complete", step: "tts" }],
+        startEvents: [{ event: "step_progress", step: "step_tts" }],
+        completeEvents: [{ event: "phase_complete", step: "step_tts" }],
         fallbackStart: ["Generating TTS Audios"],
         fallbackComplete: [],
         errorPatterns: ["TTS"]
       },
       {
-        id: "upload_assets",
+        id: "step_upload",
         label: "上传资产",
         desc: "上传到 TOS",
         startEvents: [{ event: "upload_start" }, { event: "upload_progress" }],
@@ -1975,7 +1972,7 @@ const FLOW_TREE_CONFIG = {
       }
     ],
     fallbackStart: ["Starting Asset Generation Workflow"],
-    stepAliases: { start: "download_assets", download_assets: "download_assets" },
+    stepAliases: { start: "step_download", step_download: "step_download" },
     parallel: {
       label: "并行阶段",
       groups: [
@@ -1985,34 +1982,34 @@ const FLOW_TREE_CONFIG = {
           desc: "角色 / 地点 / 分镜提示词",
           items: [
             {
-              id: "character_prompts",
+              id: "step_character_prompts",
               label: "角色提示词",
-              step: "character_prompts",
-              startEvents: [{ event: "step_progress", step: "character_prompts" }],
-              completeEvents: [{ event: "phase_complete", step: "character_prompts" }],
+              step: "step_character_prompts",
+              startEvents: [{ event: "step_progress", step: "step_character_prompts" }],
+              completeEvents: [{ event: "phase_complete", step: "step_character_prompts" }],
               fallbackStart: ["Starting Character Workflow", "Building Character Prompts"],
               fallbackComplete: ["Character Prompts saved"],
-              errorSteps: ["character", "character_prompts", "build_prompts"]
+              errorSteps: ["step_character_prompts"]
             },
             {
-              id: "location_prompts",
+              id: "step_location_prompts",
               label: "地点提示词",
-              step: "location_prompts",
-              startEvents: [{ event: "step_progress", step: "location_prompts" }],
-              completeEvents: [{ event: "phase_complete", step: "location_prompts" }],
+              step: "step_location_prompts",
+              startEvents: [{ event: "step_progress", step: "step_location_prompts" }],
+              completeEvents: [{ event: "phase_complete", step: "step_location_prompts" }],
               fallbackStart: ["Starting Location Workflow", "Building Location Prompts"],
               fallbackComplete: ["Location Prompts saved"],
-              errorSteps: ["location_prompts", "build_prompts"]
+              errorSteps: ["step_location_prompts"]
             },
             {
-              id: "fenjing_prompts",
+              id: "step_fenjing_prompts",
               label: "分镜提示词",
-              step: "fenjing_prompts",
-              startEvents: [{ event: "step_progress", step: "fenjing_prompts" }],
-              completeEvents: [{ event: "phase_complete", step: "fenjing_prompts" }],
+              step: "step_fenjing_prompts",
+              startEvents: [{ event: "step_progress", step: "step_fenjing_prompts" }],
+              completeEvents: [{ event: "phase_complete", step: "step_fenjing_prompts" }],
               fallbackStart: ["Starting Fenjing Prompt Workflow", "Building Fenjing Prompts"],
               fallbackComplete: ["Fenjing Prompts saved"],
-              errorSteps: ["fenjing_prompts", "build_prompts"]
+              errorSteps: ["step_fenjing_prompts"]
             }
           ]
         },
@@ -2022,41 +2019,40 @@ const FLOW_TREE_CONFIG = {
           desc: "角色 / 地点 / 换装图",
           items: [
             {
-              id: "character_images",
+              id: "step_character_images",
               label: "角色图",
-              step: "character_images",
-              dependsOn: ["character_prompts"],
-              startEvents: [{ event: "step_progress", step: "character_images" }],
-              completeEvents: [{ event: "phase_complete", step: "character_images" }],
+              step: "step_character_images",
+              dependsOn: ["step_character_prompts"],
+              startEvents: [{ event: "step_progress", step: "step_character_images" }],
+              completeEvents: [{ event: "phase_complete", step: "step_character_images" }],
               fallbackStart: ["Generating Character Images"],
               fallbackComplete: [],
-              errorSteps: ["generate_images", "character", "character_images"]
+              errorSteps: ["step_character_images"]
             },
             {
-              id: "location_images",
+              id: "step_location_images",
               label: "地点图",
-              step: "location_images",
-              dependsOn: ["location_prompts", "fenjing_prompts"],
-              startEvents: [{ event: "step_progress", step: "location_images" }],
-              completeEvents: [{ event: "phase_complete", step: "location_images" }],
+              step: "step_location_images",
+              dependsOn: ["step_location_prompts", "step_fenjing_prompts"],
+              startEvents: [{ event: "step_progress", step: "step_location_images" }],
+              completeEvents: [{ event: "phase_complete", step: "step_location_images" }],
               fallbackStart: ["Generating Location Images"],
               fallbackComplete: [],
-              errorSteps: ["generate_location_images", "location_images"]
+              errorSteps: ["step_location_images"]
             },
             {
-              id: "cloth_images",
+              id: "step_cloth_images",
               label: "服装与换装",
-              step: "cloth_images",
-              dependsOn: ["character_images"],
+              step: "step_cloth_images",
+              dependsOn: ["step_character_images"],
               startEvents: [
-                { event: "phase_start", phase: "phase_cloth_generation" },
-                { event: "step_progress", step: "validate_cloth" },
-                { event: "step_progress", step: "generate_cloth" }
+                { event: "phase_start", phase: "step_cloth_images" },
+                { event: "step_progress", step: "step_cloth_images" }
               ],
-              completeEvents: [{ event: "phase_complete", phase: "phase_cloth_generation" }],
+              completeEvents: [{ event: "phase_complete", phase: "step_cloth_images" }],
               fallbackStart: ["generate_cloth_images", "generate_cloth_changed_images"],
               fallbackComplete: ["generate_cloth_images: generated", "generate_cloth_changed_images: generated"],
-              errorSteps: ["generate_cloth", "validate_cloth", "cloth", "cloth_images"]
+              errorSteps: ["step_cloth_images"]
             }
           ]
         },
@@ -2066,14 +2062,14 @@ const FLOW_TREE_CONFIG = {
           desc: "TTS 语音",
           items: [
             {
-              id: "tts",
+              id: "step_tts",
               label: "TTS 语音",
-              step: "tts",
-              startEvents: [{ event: "step_progress", step: "tts" }],
-              completeEvents: [{ event: "phase_complete", step: "tts" }],
+              step: "step_tts",
+              startEvents: [{ event: "step_progress", step: "step_tts" }],
+              completeEvents: [{ event: "phase_complete", step: "step_tts" }],
               fallbackStart: ["Generating TTS Audios"],
               fallbackComplete: [],
-              errorSteps: ["generate_tts", "tts"]
+              errorSteps: ["step_tts"]
             }
           ]
         }
@@ -2085,39 +2081,39 @@ const FLOW_TREE_CONFIG = {
           id: "prepare",
           label: "准备",
           nodes: [
-            { id: "download_assets", step: "download_assets" }
+            { id: "step_download", step: "step_download" }
           ]
         },
         {
           id: "prompts",
           label: "提示词",
           nodes: [
-            { id: "character_prompts", item: "character_prompts" },
-            { id: "location_prompts", item: "location_prompts" },
-            { id: "fenjing_prompts", item: "fenjing_prompts" }
+            { id: "step_character_prompts", item: "step_character_prompts" },
+            { id: "step_location_prompts", item: "step_location_prompts" },
+            { id: "step_fenjing_prompts", item: "step_fenjing_prompts" }
           ]
         },
         {
           id: "generate",
           label: "生成",
           nodes: [
-            { id: "character_images", item: "character_images" },
-            { id: "location_images", item: "location_images" },
-            { id: "tts", item: "tts" }
+            { id: "step_character_images", item: "step_character_images" },
+            { id: "step_location_images", item: "step_location_images" },
+            { id: "step_tts", item: "step_tts" }
           ]
         },
         {
           id: "upload",
           label: "上传",
           nodes: [
-            { id: "upload_assets", step: "upload_assets" }
+            { id: "step_upload", step: "step_upload" }
           ]
         },
         {
           id: "cloth",
           label: "换装",
           nodes: [
-            { id: "cloth_images", item: "cloth_images" }
+            { id: "step_cloth_images", item: "step_cloth_images" }
           ]
         }
       ]
@@ -2127,30 +2123,30 @@ const FLOW_TREE_CONFIG = {
     title: "分镜图生成",
     steps: [
       {
-        id: "download_assets",
+        id: "step_download",
         label: "下载资产",
         desc: "下载提示词与参考图",
-        startEvents: [{ event: "phase_start", phase: "phase_download_assets" }],
-        completeEvents: [{ event: "phase_complete", phase: "phase_download_assets" }],
+        startEvents: [{ event: "phase_start", phase: "step_download" }],
+        completeEvents: [{ event: "phase_complete", phase: "step_download" }],
         fallbackStart: ["download_assets"],
-        fallbackComplete: ["phase_download_assets completed"],
+        fallbackComplete: ["step_download completed"],
         errorPatterns: ["download_assets", "characters.jsonl", "location_prompts.jsonl"]
       },
       {
-        id: "generate_images",
+        id: "step_generate",
         label: "生成分镜图",
         desc: "分镜与换装图生成",
         startEvents: [
-          { event: "phase_start", phase: "phase_generate_images" },
-          { event: "step_progress", step: "generate_images" }
+          { event: "phase_start", phase: "step_generate" },
+          { event: "step_progress", step: "step_generate" }
         ],
-        completeEvents: [{ event: "phase_complete", phase: "phase_generate_images" }],
+        completeEvents: [{ event: "phase_complete", phase: "step_generate" }],
         fallbackStart: ["generate_cloth_images", "generate_cloth_changed_images", "chapter_completed"],
-        fallbackComplete: ["phase_generate_images completed"],
+        fallbackComplete: ["step_generate completed"],
         errorPatterns: ["fenjing", "generate_images", "chapter"]
       },
       {
-        id: "upload_assets",
+        id: "step_upload",
         label: "上传资产",
         desc: "上传到 TOS",
         startEvents: [{ event: "upload_start" }, { event: "upload_progress" }],
@@ -2161,28 +2157,28 @@ const FLOW_TREE_CONFIG = {
       }
     ],
     fallbackStart: ["fenjing workflow start"],
-    stepAliases: { error: "generate_images" }
+    stepAliases: { error: "step_generate" }
   },
   fenjing_generate: {
     title: "分镜图生成",
     steps: [
       {
-        id: "download_assets",
+        id: "step_download",
         label: "下载资产",
         desc: "下载提示词与参考图",
-        startEvents: [{ event: "fenjing_generate_start" }, { event: "phase_start", phase: "phase_download_assets" }],
-        completeEvents: [{ event: "phase_complete", phase: "phase_download_assets" }],
+        startEvents: [{ event: "fenjing_generate_start" }, { event: "phase_start", phase: "step_download" }],
+        completeEvents: [{ event: "phase_complete", phase: "step_download" }],
         fallbackStart: ["download_assets"],
-        fallbackComplete: ["phase_download_assets completed"],
+        fallbackComplete: ["step_download completed"],
         errorPatterns: ["download_assets", "characters.jsonl", "location_prompts.jsonl"]
       },
       {
-        id: "generate_images",
+        id: "step_generate",
         label: "生成分镜图",
         desc: "分镜图生成到本地",
         startEvents: [
-          { event: "phase_start", phase: "phase_generate_images" },
-          { event: "step_progress", step: "generate_images" }
+          { event: "phase_start", phase: "step_generate" },
+          { event: "step_progress", step: "step_generate" }
         ],
         completeEvents: [{ event: "fenjing_generate_complete" }],
         fallbackStart: ["fenjing_image_start", "fenjing_image_attempt"],
@@ -2190,7 +2186,7 @@ const FLOW_TREE_CONFIG = {
         errorPatterns: ["fenjing", "generate_images", "chapter"]
       },
       {
-        id: "upload_fenjing_images",
+        id: "step_upload",
         label: "上传分镜图",
         desc: "上传分镜图到云存储",
         startEvents: [{ event: "fenjing_upload_start" }],
@@ -2201,13 +2197,13 @@ const FLOW_TREE_CONFIG = {
       }
     ],
     fallbackStart: ["fenjing_generate workflow start"],
-    stepAliases: { error: "generate_images" }
+    stepAliases: { error: "step_generate" }
   },
   fenjing_upload: {
     title: "上传分镜图",
     steps: [
       {
-        id: "upload_fenjing_images",
+        id: "step_upload",
         label: "上传到 TOS",
         desc: "上传分镜图到云存储",
         startEvents: [{ event: "fenjing_upload_start" }],
@@ -2218,13 +2214,13 @@ const FLOW_TREE_CONFIG = {
       }
     ],
     fallbackStart: ["fenjing_upload workflow start"],
-    stepAliases: { error: "upload_fenjing_images" }
+    stepAliases: { error: "step_upload" }
   },
   video: {
     title: "视频生成",
     steps: [
       {
-        id: "prepare",
+        id: "step_prepare",
         label: "准备素材",
         desc: "检查分镜提示词",
         startEvents: [{ event: "flow_start" }],
@@ -2234,30 +2230,30 @@ const FLOW_TREE_CONFIG = {
         errorPatterns: ["No storyboard", "fenjing_prompts"]
       },
       {
-        id: "phase1_video_prompts",
+        id: "step_video_prompts",
         label: "分镜提示词",
         desc: "生成视频分镜提示词",
-        startEvents: [{ event: "phase_start", phase: "phase1_video_prompts" }],
-        completeEvents: [{ event: "phase_complete", phase: "phase1_video_prompts" }],
+        startEvents: [{ event: "phase_start", phase: "step_video_prompts" }],
+        completeEvents: [{ event: "phase_complete", phase: "step_video_prompts" }],
         fallbackStart: ["PHASE 1", "Audio Durations"],
-        fallbackComplete: ["phase1_video_prompts completed"],
+        fallbackComplete: ["step_video_prompts completed"],
         errorPatterns: ["audio", "duration", "video prompts"]
       },
       {
-        id: "phase2_video_generation",
+        id: "step_video_generation",
         label: "视频生成",
         desc: "提交任务并轮询",
         startEvents: [
-          { event: "phase_start", phase: "phase2_video_generation" },
-          { event: "step_progress", step: "video_task_submit" }
+          { event: "phase_start", phase: "step_video_generation" },
+          { event: "step_progress", step: "step_video_generation" }
         ],
-        completeEvents: [{ event: "phase_complete", phase: "phase2_video_generation" }],
+        completeEvents: [{ event: "phase_complete", phase: "step_video_generation" }],
         fallbackStart: ["PHASE 2", "video task submission", "Waiting for all"],
-        fallbackComplete: ["phase2_video_generation completed"],
+        fallbackComplete: ["step_video_generation completed"],
         errorPatterns: ["video task", "polling", "download"]
       },
       {
-        id: "fenjing_video_upload",
+        id: "step_video_upload",
         label: "上传视频",
         desc: "上传到 TOS",
         startEvents: [{ event: "fenjing_video_upload_start" }, { event: "fenjing_video_uploaded" }],
@@ -2268,7 +2264,7 @@ const FLOW_TREE_CONFIG = {
       }
     ],
     fallbackStart: ["Video Workflow Started"],
-    stepAliases: { start: "prepare", prepare: "prepare" }
+    stepAliases: { start: "step_prepare", step_prepare: "step_prepare" }
   }
 };
 
@@ -3723,12 +3719,12 @@ function getFlowStepStatus(flow, stepId) {
 
 function isAssetGenerating(assetType) {
   const map = {
-    character: { flow: "visual_audio_assets", steps: ["character_images"], regenJobs: ["regenerate_character"] },
-    location: { flow: "visual_audio_assets", steps: ["location_images"], regenJobs: ["regenerate_location_image"] },
-    fenjing: { flow: "fenjing_generate", steps: ["generate_images", "upload_fenjing_images"], regenJobs: ["regenerate_fenjing"] },
-    video: { flow: "video", steps: ["phase2_video_generation"], regenJobs: ["regenerate_video"] },
-    cloth: { flow: "visual_audio_assets", steps: ["cloth_images"], regenJobs: ["regenerate_cloth"] },
-    cloth_changed: { flow: "visual_audio_assets", steps: ["cloth_images"], regenJobs: ["regenerate_cloth_changed"] }
+    character: { flow: "visual_audio_assets", steps: ["step_character_images"], regenJobs: ["regenerate_character"] },
+    location: { flow: "visual_audio_assets", steps: ["step_location_images"], regenJobs: ["regenerate_location_image"] },
+    fenjing: { flow: "fenjing_generate", steps: ["step_generate"], regenJobs: ["regenerate_fenjing"] },
+    video: { flow: "video", steps: ["step_video_generation"], regenJobs: ["regenerate_video"] },
+    cloth: { flow: "visual_audio_assets", steps: ["step_cloth_images"], regenJobs: ["regenerate_cloth"] },
+    cloth_changed: { flow: "visual_audio_assets", steps: ["step_cloth_images"], regenJobs: ["regenerate_cloth_changed"] }
   };
   const config = map[assetType];
   if (!config) {
@@ -5834,7 +5830,7 @@ async function submitFlow(flow) {
       return;
     }
     setFlowTouched(state.selectedProject, flow);
-    payload = { phase: "step1", ...payload, ...buildAutoStoryboardPayload(result.config) };
+    payload = { phase: "step_extract", ...payload, ...buildAutoStoryboardPayload(result.config) };
     try {
       await apiPost(`/api/projects/${state.selectedProject}/clean/${flow}`);
       await refreshAssets();
@@ -5895,8 +5891,7 @@ async function executeFlowFull(flow, options) {
   setFlowTouched(state.selectedProject, flow);
   await clearPendingFlow(flow);
   const phase = options && options.phase ? String(options.phase) : "";
-  const skipClean = (flow === "fenjing" && phase === "upload_assets")
-    || (flow === "video" && !!phase && phase !== "all");
+  const skipClean = (flow === "video" && !!phase && phase !== "all");
   if (!skipClean) {
     try {
       await apiPost(`/api/projects/${state.selectedProject}/clean/${flow}`);
