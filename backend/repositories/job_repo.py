@@ -22,7 +22,7 @@ USAGE_EVENTS_LOCK = threading.Lock()
 def log_event(level: str, message: str, **fields: Any) -> None:
     """输出结构化日志事件，统一包含 trace_id 等关键字段。"""
     payload = {
-        "ts": time.time(),
+        "time": time.strftime("%y%m%d %H:%M:%S"),
         "level": level,
         "message": message,
         "trace_id": fields.pop("trace_id", ""),

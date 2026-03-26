@@ -5945,7 +5945,13 @@ async function submitFlowPhase(flow, phase) {
     Object.assign(payload, buildAutoStoryboardPayload(state.autoStoryboardConfig));
   }
   state.jobs = state.jobs.filter(j => !j.id.startsWith(`pending_${flow}_`));
-  const job = await apiPost(`/api/projects/${state.selectedProject}/run/${flow}`, payload);
+  let job;
+  try {
+    job = await apiPost(`/api/projects/${state.selectedProject}/run/${flow}`, payload);
+  } catch (err) {
+    window.alert(`启动 ${flow} 失败: ${err.message}`);
+    return;
+  }
   setJobs([job, ...state.jobs]);
   renderJobs();
   pollJob(job.id);

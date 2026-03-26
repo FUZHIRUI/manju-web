@@ -7,6 +7,11 @@ from ..repositories import project_repo, status_repo
 from .workflow_runtime.io_jsonl import read_jsonl
 
 
+WORKFLOW_TO_FLOW_MAP: Dict[str, str] = {
+    "fenjing_generate": "fenjing_generate",
+    "fenjing_upload": "fenjing_upload",
+}
+
 _project_locks: Dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
 

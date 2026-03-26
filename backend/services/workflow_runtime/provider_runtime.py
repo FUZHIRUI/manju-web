@@ -113,7 +113,7 @@ def emit_event(
     data: Optional[Dict[str, Any]] = None,
 ) -> None:
     payload: Dict[str, Any] = {
-        "ts": time.time(),
+        "time": time.strftime("%y%m%d %H:%M:%S"),
         "level": level,
         "flow": flow,
         "event": event,

@@ -56,7 +56,7 @@ CHAPTER_PATTERN = re.compile(r"^storyboard_chapter_\d+$")
 
 def log_event(level: str, message: str, **fields: Any) -> None:
     payload = {
-        "ts": time.time(),
+        "time": time.strftime("%y%m%d %H:%M:%S"),
         "level": level,
         "message": message,
         "trace_id": fields.pop("trace_id", ""),
