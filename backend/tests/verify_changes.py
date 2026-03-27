@@ -53,22 +53,17 @@ class TestPhaseUnificationContracts:
         from backend.services import status_service
 
         flow_steps = status_service._FLOW_STEPS
-        assert flow_steps["auto_storyboard"] == ["phase1", "phase2", "upload"]
-        assert flow_steps["fenjing"] == ["download_assets", "generate_images", "upload_assets"]
-        assert flow_steps["video"] == ["prepare", "phase1_video_prompts", "phase2_video_generation", "fenjing_video_upload"]
-        assert "build_prompts" in flow_steps["visual_audio_assets"]
-        assert "cloth_changed" in flow_steps["visual_audio_assets"]
+        assert flow_steps["auto_storyboard"] == ["step_extract", "step_storyboard", "step_upload"]
+        assert "fenjing" not in flow_steps
+        assert flow_steps["fenjing_generate"] == ["step_download", "step_generate"]
+        assert flow_steps["fenjing_upload"] == ["step_upload"]
+        assert flow_steps["video"] == ["step_prepare", "step_video_prompts", "step_video_generation", "step_video_upload"]
+        assert "step_cloth_changed" in flow_steps["visual_audio_assets"]
+        assert "step_download" not in flow_steps["visual_audio_assets"]
 
         partial = status_service._PARTIAL_STEPS
-        assert "cloth_changed" in partial["visual_audio_assets"]
-        assert "phase2_video_generation" in partial["video"]
-
-    def test_resolve_video_phases(self) -> None:
-        from backend.services import status_service
-
-        assert status_service._resolve_step("video", "phase_start", "phase1_video_prompts", "phase1_video_prompts") == "phase1_video_prompts"
-        assert status_service._resolve_step("video", "phase_start", "phase2_video_generation", "phase2_video_generation") == "phase2_video_generation"
-        assert status_service._resolve_step("video", "upload_complete", "fenjing_video_upload", None) == "fenjing_video_upload"
+        assert "step_cloth_changed" in partial["visual_audio_assets"]
+        assert "step_video_generation" in partial["video"]
 
 
 class TestFenjingApiContracts:
@@ -99,22 +94,22 @@ class TestFenjingApiContracts:
         status_service.mark_flow_running(project, "visual_audio_assets", steps, reset_steps=True)
         state = status_service.get_flow_state(project)
         assert state["flows"]["visual_audio_assets"]["status"] == "running"
-        assert state["flows"]["visual_audio_assets"]["steps"]["build_prompts"] == "running"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_character_prompts"] == "running"
 
-        status_service.mark_flow_partial(project, "visual_audio_assets", ["character_images"])
+        status_service.mark_flow_partial(project, "visual_audio_assets", ["step_character_images"])
         state = status_service.get_flow_state(project)
         assert state["flows"]["visual_audio_assets"]["status"] == "partial_returned"
-        assert state["flows"]["visual_audio_assets"]["steps"]["character_images"] == "partial_returned"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_character_images"] == "partial_returned"
 
-        status_service.mark_flow_error(project, "visual_audio_assets", ["build_prompts"])
+        status_service.mark_flow_error(project, "visual_audio_assets", ["step_character_prompts"])
         state = status_service.get_flow_state(project)
         assert state["flows"]["visual_audio_assets"]["status"] == "error"
-        assert state["flows"]["visual_audio_assets"]["steps"]["build_prompts"] == "error"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_character_prompts"] == "error"
 
         status_service.mark_flow_completed(project, "visual_audio_assets")
         state = status_service.get_flow_state(project)
         assert state["flows"]["visual_audio_assets"]["status"] == "completed"
-        assert state["flows"]["visual_audio_assets"]["steps"]["build_prompts"] == "completed"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_character_prompts"] == "completed"
 
     def test_reset_visual_audio_prompt_steps(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
         from backend.repositories import project_repo
@@ -129,10 +124,9 @@ class TestFenjingApiContracts:
         status_service.mark_flow_completed(project, "visual_audio_assets")
         status_service.reset_flow_steps(project, "visual_audio_assets", steps)
         state = status_service.get_flow_state(project)
-        assert state["flows"]["visual_audio_assets"]["steps"]["build_prompts"] == "waiting"
-        assert state["flows"]["visual_audio_assets"]["steps"]["character_prompts"] == "waiting"
-        assert state["flows"]["visual_audio_assets"]["steps"]["location_prompts"] == "waiting"
-        assert state["flows"]["visual_audio_assets"]["steps"]["fenjing_prompts"] == "waiting"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_character_prompts"] == "waiting"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_location_prompts"] == "waiting"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_fenjing_prompts"] == "waiting"
 
 
 class TestPhaseUnificationFrontend:
@@ -401,14 +395,14 @@ class TestPhaseUnificationFrontend:
             "visual_audio_assets",
             "upload_progress",
             "INFO",
-            "character_images",
+            "step_character_images",
             None,
             project,
         )
 
         state = status_service.get_flow_state(project)
-        assert state["flows"]["visual_audio_assets"]["steps"]["upload_assets"] != "running"
-        assert state["flows"]["visual_audio_assets"]["steps"]["character_images"] == "running"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_upload"] != "running"
+        assert state["flows"]["visual_audio_assets"]["steps"]["step_character_images"] == "running"
 
 
 if __name__ == "__main__":

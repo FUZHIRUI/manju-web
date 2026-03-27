@@ -848,13 +848,13 @@ function appendTreeAction(container, label, buttonLabel, onClick, options) {
 
 function appendAutoStoryboardPhaseButtons(job, container) {
   const disabled = job && job.status === "running";
-  appendTreeAction(container, "步骤 1", getFlowActionLabel("auto_storyboard", "step1"), () => runAutoStoryboardPhase("step1"), {
+  appendTreeAction(container, "步骤 1", getFlowActionLabel("auto_storyboard", "step_extract"), () => runAutoStoryboardPhase("step1"), {
     disabled
   });
-  appendTreeAction(container, "步骤 2", getFlowActionLabel("auto_storyboard", "step2"), () => runAutoStoryboardPhase("step2"), {
+  appendTreeAction(container, "步骤 2", getFlowActionLabel("auto_storyboard", "step_storyboard"), () => runAutoStoryboardPhase("step2"), {
     disabled
   });
-  appendTreeAction(container, "上传资产", getFlowActionLabel("auto_storyboard", "step3_upload"), () => runAutoStoryboardPhase("step3_upload"), {
+  appendTreeAction(container, "上传资产", getFlowActionLabel("auto_storyboard", "step_upload"), () => runAutoStoryboardPhase("step3_upload"), {
     disabled
   });
 }
@@ -1347,17 +1347,7 @@ function buildVisualAudioTreeElement(config) {
     stepsWrap.appendChild(diagram);
     container.appendChild(stepsWrap);
   } else {
-    const headStep = config.steps.find((step) => step.id === "download_assets");
     const tailStep = config.steps[config.steps.length - 1] || null;
-    if (headStep) {
-      const head = buildTreeStepElement(headStep);
-      stepsWrap.appendChild(head.stepEl);
-    }
-
-    const connectorHead = document.createElement("div");
-    connectorHead.className = "tree-connector";
-    connectorHead.dataset.connector = "head";
-    stepsWrap.appendChild(connectorHead);
 
     const parallelWrap = document.createElement("div");
     parallelWrap.className = "tree-parallel";
@@ -1505,23 +1495,13 @@ function buildVisualAudioConnections(config) {
     });
   });
   const tailLevelIndex = levels.length - 1;
-  const uploadLevelIndex = levels.findIndex((level) => (level.nodes || []).some((node) => node.step === "upload_assets"));
+  const uploadLevelIndex = levels.findIndex((level) => (level.nodes || []).some((node) => node.step === "step_upload"));
   if (uploadLevelIndex > 0) {
     const prevLevel = levels[uploadLevelIndex - 1];
-    const uploadNode = levels[uploadLevelIndex].nodes.find((node) => node.step === "upload_assets");
+    const uploadNode = levels[uploadLevelIndex].nodes.find((node) => node.step === "step_upload");
     if (prevLevel && uploadNode) {
       (prevLevel.nodes || []).forEach((node) => {
         edges.push({ from: node.id, to: uploadNode.id });
-      });
-    }
-  }
-  const prepareLevelIndex = levels.findIndex((level) => (level.nodes || []).some((node) => node.step === "download_assets"));
-  const promptLevel = levels.find((level) => level.id === "prompts");
-  if (prepareLevelIndex >= 0 && promptLevel) {
-    const prepareNode = levels[prepareLevelIndex].nodes.find((node) => node.step === "download_assets");
-    if (prepareNode) {
-      (promptLevel.nodes || []).forEach((node) => {
-        edges.push({ from: prepareNode.id, to: node.id });
       });
     }
   }
@@ -1599,22 +1579,22 @@ function updateVisualAudioTreeDiagram(logs, events, config, container) {
     ? state.flowStatus.flows.visual_audio_assets.steps || {}
     : {};
   const mergedSteps = { ...flowSteps };
-  if ("cloth_changed" in mergedSteps || "cloth_images" in mergedSteps) {
-    const clothStatus = mergedSteps.cloth_images || "";
-    const clothChangedStatus = mergedSteps.cloth_changed || "";
+  if ("step_cloth_changed" in mergedSteps || "step_cloth_images" in mergedSteps) {
+    const clothStatus = mergedSteps.step_cloth_images || "";
+    const clothChangedStatus = mergedSteps.step_cloth_changed || "";
     const statuses = [clothStatus, clothChangedStatus].filter((item) => item);
     const hasError = statuses.some((item) => item === "error");
     const allCompleted = statuses.length > 0 && statuses.every((item) => item === "completed");
     const anyRunning = statuses.some((item) => item === "running");
     const anyPartial = statuses.some((item) => item === "partial_returned" || item === "partial_completed");
     if (hasError) {
-      mergedSteps.cloth_images = "error";
+      mergedSteps.step_cloth_images = "error";
     } else if (allCompleted) {
-      mergedSteps.cloth_images = "completed";
+      mergedSteps.step_cloth_images = "completed";
     } else if (anyRunning || anyPartial) {
-      mergedSteps.cloth_images = "running";
+      mergedSteps.step_cloth_images = "running";
     } else if (statuses.length > 0) {
-      mergedSteps.cloth_images = "waiting";
+      mergedSteps.step_cloth_images = "waiting";
     }
   }
   const stepNodes = Array.from(container.querySelectorAll(".tree-step"));
@@ -1664,43 +1644,17 @@ function updateVisualAudioTreeDiagram(logs, events, config, container) {
   stepStates.forEach((state) => {
     stepStateMap[state.step.id] = state;
   });
-  const headState = stepStateMap.download_assets;
   const tailKey = (config.steps[config.steps.length - 1] || {}).id;
   const tailState = tailKey ? stepStateMap[tailKey] : null;
-  const headStepEl = container.querySelector('.tree-step[data-step="download_assets"]');
   const tailStepEl = tailKey ? container.querySelector(`.tree-step[data-step="${tailKey}"]`) : null;
-  const headStatus = headStepEl ? headStepEl.querySelector(".tree-status") : null;
   const tailStatus = tailStepEl ? tailStepEl.querySelector(".tree-status") : null;
-  const connectorHead = container.querySelector('.tree-connector[data-connector="head"]');
   const connectorTail = container.querySelector('.tree-connector[data-connector="tail"]');
-  
-  [headStepEl, tailStepEl].forEach((el) => {
-    if (el) {
-      el.className = "tree-step";
-    }
-  });
-  [connectorHead, connectorTail].forEach((connector) => {
-    if (connector) {
-      connector.className = "tree-connector";
-    }
-  });
 
-  if (headState && headStepEl && headStatus) {
-    if (headState.failed) {
-      headStepEl.classList.add("error");
-      headStatus.textContent = "失败";
-    } else if (headState.completed) {
-      headStepEl.classList.add("completed");
-      headStatus.textContent = "已完成";
-      if (connectorHead) {
-        connectorHead.classList.add("completed");
-      }
-    } else if (headState.started) {
-      headStepEl.classList.add("running");
-      headStatus.textContent = "进行中";
-    } else {
-      headStatus.textContent = "等待中";
-    }
+  if (tailStepEl) {
+    tailStepEl.className = "tree-step";
+  }
+  if (connectorTail) {
+    connectorTail.className = "tree-connector";
   }
 
   if (tailState && tailStepEl && tailStatus) {
@@ -1904,16 +1858,6 @@ const FLOW_TREE_CONFIG = {
     title: "角色与素材生成",
     steps: [
       {
-        id: "step_download",
-        label: "准备资产",
-        desc: "下载基础素材",
-        startEvents: [{ event: "flow_start" }],
-        completeEvents: [],
-        fallbackStart: ["Using Assets Directory", "Starting Asset Generation Workflow"],
-        fallbackComplete: [],
-        errorPatterns: ["download", "Failed to download", "download_assets"]
-      },
-      {
         id: "step_prompts",
         label: "构建提示词",
         desc: "角色/地点/分镜提示词",
@@ -1972,7 +1916,7 @@ const FLOW_TREE_CONFIG = {
       }
     ],
     fallbackStart: ["Starting Asset Generation Workflow"],
-    stepAliases: { start: "step_download", step_download: "step_download" },
+    stepAliases: { start: "step_character_prompts" },
     parallel: {
       label: "并行阶段",
       groups: [
@@ -2077,13 +2021,6 @@ const FLOW_TREE_CONFIG = {
     },
     tree: {
       levels: [
-        {
-          id: "prepare",
-          label: "准备",
-          nodes: [
-            { id: "step_download", step: "step_download" }
-          ]
-        },
         {
           id: "prompts",
           label: "提示词",
@@ -2616,13 +2553,12 @@ function updateTreeDiagram(job, container) {
       };
     }
   });
-  // 支持新的 step 命名
-  const step1Step = stepElements.step1 ? stepElements.step1.stepEl : null;
-  const step2Step = stepElements.step2 ? stepElements.step2.stepEl : null;
-  const step3UploadStep = stepElements.step3_upload ? stepElements.step3_upload.stepEl : null;
-  const step1Status = stepElements.step1 ? stepElements.step1.statusEl : null;
-  const step2Status = stepElements.step2 ? stepElements.step2.statusEl : null;
-  const step3UploadStatus = stepElements.step3_upload ? stepElements.step3_upload.statusEl : null;
+  const step1Step = stepElements.step_extract ? stepElements.step_extract.stepEl : null;
+  const step2Step = stepElements.step_storyboard ? stepElements.step_storyboard.stepEl : null;
+  const step3UploadStep = stepElements.step_upload ? stepElements.step_upload.stepEl : null;
+  const step1Status = stepElements.step_extract ? stepElements.step_extract.statusEl : null;
+  const step2Status = stepElements.step_storyboard ? stepElements.step_storyboard.statusEl : null;
+  const step3UploadStatus = stepElements.step_upload ? stepElements.step_upload.statusEl : null;
   const connector1 = connectors[0];
   const connector2 = connectors[1];
   if (!step1Step || !step2Step || !step3UploadStep || !nextDesc || !step1Status || !step2Status || !step3UploadStatus) {
@@ -2644,9 +2580,9 @@ function updateTreeDiagram(job, container) {
   if (useFlowStatus) {
     const stepOrder = config.steps.map((step) => step.id);
     const stepMap = {
-      step1: stepElements.step1,
-      step2: stepElements.step2,
-      step3_upload: stepElements.step3_upload,
+      step_extract: stepElements.step_extract,
+      step_storyboard: stepElements.step_storyboard,
+      step_upload: stepElements.step_upload,
     };
     const stepStates = stepOrder.map((id) => {
       const status = flowSteps[id] || "";

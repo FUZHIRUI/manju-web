@@ -7,11 +7,6 @@ from ..repositories import project_repo, status_repo
 from .workflow_runtime.io_jsonl import read_jsonl
 
 
-WORKFLOW_TO_FLOW_MAP: Dict[str, str] = {
-    "fenjing_generate": "fenjing_generate",
-    "fenjing_upload": "fenjing_upload",
-}
-
 _project_locks: Dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
 
@@ -52,7 +47,6 @@ _STATUS_ERROR = "error"
 _FLOW_STEPS = {
     "auto_storyboard": ["step_extract", "step_storyboard", "step_upload"],
     "visual_audio_assets": [
-        "step_download",
         "step_character_prompts",
         "step_location_prompts",
         "step_fenjing_prompts",
@@ -72,41 +66,6 @@ _PARTIAL_STEPS = {
     "visual_audio_assets": ["step_character_images", "step_location_images", "step_tts", "step_cloth_images", "step_cloth_changed"],
     "fenjing_generate": ["step_generate"],
     "video": ["step_video_generation"],
-}
-
-_STEP_MIGRATION = {
-    "auto_storyboard": {
-        "phase1": "step_extract", "step1": "step_extract", "step1_extract": "step_extract",
-        "phase2": "step_storyboard", "step2": "step_storyboard", "step2_storyboard": "step_storyboard",
-        "upload": "step_upload", "step3_upload": "step_upload", "step3_upload_assets": "step_upload",
-    },
-    "visual_audio_assets": {
-        "download_assets": "step_download",
-        "character_prompts": "step_character_prompts",
-        "location_prompts": "step_location_prompts",
-        "fenjing_prompts": "step_fenjing_prompts",
-        "character_images": "step_character_images",
-        "location_images": "step_location_images",
-        "cloth_images": "step_cloth_images",
-        "cloth_changed": "step_cloth_changed",
-        "tts": "step_tts",
-        "upload_assets": "step_upload",
-        # 旧父步骤忽略（不迁移）
-        "build_prompts": None, "generate_images": None, "generate_tts": None,
-    },
-    "fenjing_generate": {
-        "download_assets": "step_download",
-        "generate_images": "step_generate",
-    },
-    "fenjing_upload": {
-        "upload_fenjing_images": "step_upload",
-    },
-    "video": {
-        "prepare": "step_prepare",
-        "phase1_video_prompts": "step_video_prompts",
-        "phase2_video_generation": "step_video_generation",
-        "fenjing_video_upload": "step_video_upload",
-    },
 }
 
 # Rollup 配置：父子聚合
@@ -153,18 +112,7 @@ def _normalize_state(project: str, data: Dict[str, Any]) -> Dict[str, Any]:
 
         steps = flow_data.get("steps") if isinstance(flow_data.get("steps"), dict) else {}
 
-        # 通用迁移：使用 _STEP_MIGRATION 将旧步骤名映射到新步骤名
-        if flow in _STEP_MIGRATION:
-            migration = _STEP_MIGRATION[flow]
-            for old_step, old_status in steps.items():
-                if old_step in migration:
-                    new_step = migration[old_step]
-                    if new_step is not None and new_step in merged_flow["steps"] and isinstance(old_status, str):
-                        # 只在新步骤仍为 waiting 时迁移（避免覆盖已有的新格式值）
-                        if merged_flow["steps"][new_step] == _STATUS_WAITING:
-                            merged_flow["steps"][new_step] = old_status
-
-        # 合并已存在的步骤（新命名）
+        # 合并已存在的步骤
         for step, step_status in steps.items():
             if step in merged_flow["steps"] and isinstance(step_status, str):
                 merged_flow["steps"][step] = step_status
@@ -229,7 +177,6 @@ def resolve_visual_audio_steps(step_filter: str) -> list:
     tokens = _normalize_step_tokens(step_filter)
     if not tokens or "all" in tokens:
         return [
-            "step_download",
             "step_character_prompts", "step_location_prompts", "step_fenjing_prompts",
             "step_character_images", "step_location_images",
             "step_cloth_images", "step_cloth_changed",
@@ -238,9 +185,7 @@ def resolve_visual_audio_steps(step_filter: str) -> list:
         ]
     steps: list = []
     for token in tokens:
-        if token in {"download_assets", "download", "step_download"}:
-            steps.append("step_download")
-        elif token in {"build_prompts", "character_prompts", "location_prompts", "fenjing_prompts",
+        if token in {"build_prompts", "character_prompts", "location_prompts", "fenjing_prompts",
                        "step_character_prompts", "step_location_prompts", "step_fenjing_prompts"}:
             steps.extend(["step_character_prompts", "step_location_prompts", "step_fenjing_prompts"])
         elif token in {"generate_images", "character_images", "location_images",
@@ -304,7 +249,7 @@ def _rollup_sequential(state: Dict[str, Any], flow: str) -> None:
     step_order = _ROLLUP_SEQUENTIAL[flow]
     for i, step in enumerate(step_order):
         current_status = steps.get(step, _STATUS_WAITING)
-        if current_status == _STATUS_COMPLETED:
+        if current_status in {_STATUS_COMPLETED, _STATUS_RUNNING, _STATUS_ERROR, _STATUS_PARTIAL_RETURNED}:
             continue
         if i > 0:
             prev_step = step_order[i - 1]
@@ -391,128 +336,6 @@ def mark_flow_partial(project: str, flow: str, steps: Optional[list] = None) -> 
     status_repo.write_flow_state(project, state)
 
 
-def _resolve_step(flow: str, event: str, step: Optional[str], phase: Optional[str]) -> Optional[str]:
-    # 直通逻辑：step 已在 _FLOW_STEPS 中则直接返回
-    if step and flow in _FLOW_STEPS and step in _FLOW_STEPS[flow]:
-        return step
-    # 检查 _STEP_MIGRATION
-    if step and flow in _STEP_MIGRATION:
-        migrated = _STEP_MIGRATION[flow].get(step)
-        if migrated is not None:
-            return migrated
-    # phase 也可能是旧名
-    if phase and flow in _STEP_MIGRATION:
-        migrated = _STEP_MIGRATION[flow].get(phase)
-        if migrated is not None:
-            return migrated
-
-    if flow == "auto_storyboard":
-        if phase in {"phase1", "phase2"}:
-            return _STEP_MIGRATION["auto_storyboard"].get(phase)
-        if step in {"phase1", "phase2", "upload"}:
-            return _STEP_MIGRATION["auto_storyboard"].get(step)
-        if step == "phase1_api_call":
-            return "step_extract"
-        if step == "phase2_batch_progress":
-            return "step_storyboard"
-        if event.startswith("upload_"):
-            return "step_upload"
-        return None
-    if flow == "visual_audio_assets":
-        if event == "flow_start":
-            return "step_download"
-        if step in {"generate_location_images", "generate_cloth", "generate_cloth_images", "generate_cloth_changed_images", "validate_cloth", "phase_cloth_generation"}:
-            return "step_cloth_images"
-        if step == "cloth_changed":
-            return "step_cloth_changed"
-        if event.startswith("upload_"):
-            return "step_upload"
-        return None
-    if flow == "fenjing":
-        # 旧 fenjing flow 的事件映射到 fenjing_generate
-        if phase == "phase_download_assets":
-            return "step_download"
-        if phase == "phase_generate_images":
-            return "step_generate"
-        if step == "fenjing_image":
-            return "step_generate"
-        if event.startswith("upload_"):
-            return "step_upload"
-        return None
-    if flow == "fenjing_generate":
-        if event in {"fenjing_generate_start", "flow_start"}:
-            return "step_download"
-        if phase == "phase_download_assets":
-            return "step_download"
-        if phase == "phase_generate_images":
-            return "step_generate"
-        if step == "fenjing_image":
-            return "step_generate"
-        if event in {"fenjing_generate_complete", "fenjing_generate_phase_complete"}:
-            return "step_generate"
-        return None
-    if flow == "fenjing_upload":
-        if event in {"fenjing_upload_start", "fenjing_upload_progress", "fenjing_upload_complete"}:
-            return "step_upload"
-        return None
-    if flow == "video":
-        if event == "flow_start":
-            return "step_prepare"
-        if step in {"video_task_submit", "video_task_queue", "video_task_polling", "fenjing_video_task_create", "fenjing_video_polling", "fenjing_video_download"}:
-            return "step_video_generation"
-        if event in {"fenjing_video_upload_start", "fenjing_video_uploaded", "upload_complete"}:
-            return "step_video_upload"
-        return None
-    return None
-
-
-def _resolve_steps(flow: str, event: str, step: Optional[str], phase: Optional[str]) -> list:
-    if flow != "visual_audio_assets":
-        step_id = _resolve_step(flow, event, step, phase)
-        return [step_id] if step_id else []
-    resolved: list = []
-    if event == "flow_start":
-        resolved.append("step_download")
-    if step:
-        # 直通：step 已在 _FLOW_STEPS 中
-        if step in _FLOW_STEPS[flow]:
-            resolved.append(step)
-        # 迁移映射
-        elif step in _STEP_MIGRATION.get(flow, {}):
-            migrated = _STEP_MIGRATION[flow][step]
-            if migrated is not None:
-                resolved.append(migrated)
-        # 特殊旧名映射
-        if step in {"character_prompts", "location_prompts", "fenjing_prompts"}:
-            migrated = _STEP_MIGRATION["visual_audio_assets"].get(step)
-            if migrated and migrated not in resolved:
-                resolved.append(migrated)
-        if step in {"character_images", "location_images"}:
-            migrated = _STEP_MIGRATION["visual_audio_assets"].get(step)
-            if migrated and migrated not in resolved:
-                resolved.append(migrated)
-        if step == "tts":
-            if "step_tts" not in resolved:
-                resolved.append("step_tts")
-        if step == "generate_location_images":
-            if "step_location_images" not in resolved:
-                resolved.append("step_location_images")
-        if step in {"generate_cloth", "generate_cloth_images", "validate_cloth", "phase_cloth_generation"}:
-            if "step_cloth_images" not in resolved:
-                resolved.append("step_cloth_images")
-        if step in {"generate_cloth_changed_images", "cloth_changed"}:
-            if "step_cloth_changed" not in resolved:
-                resolved.append("step_cloth_changed")
-    if event.startswith("upload_") and step in {"upload_assets", "step_upload"}:
-        if "step_upload" not in resolved:
-            resolved.append("step_upload")
-    deduped: list = []
-    for item in resolved:
-        if item not in deduped:
-            deduped.append(item)
-    return deduped
-
-
 def _complete_all_steps(state: Dict[str, Any], flow: str) -> None:
     flows = state.get("flows")
     if not isinstance(flows, dict) or flow not in flows:
@@ -546,7 +369,7 @@ def update_from_event(
     if not project or flow not in _FLOW_STEPS:
         return
     state = get_flow_state(project)
-    step_ids = _resolve_steps(flow, event, step, phase)
+    step_ids = [step] if step and flow in _FLOW_STEPS and step in _FLOW_STEPS[flow] else []
     if event == "flow_start":
         _set_flow_status(state, flow, _STATUS_RUNNING)
         for step_id in step_ids:

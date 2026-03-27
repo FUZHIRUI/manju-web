@@ -234,7 +234,6 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
                 "cloth_changed",
                 "cloth_changed_images",
                 # 新 step_ 前缀命名
-                "step_download",
                 "step_character_prompts",
                 "step_location_prompts",
                 "step_fenjing_prompts",
@@ -309,9 +308,8 @@ def handle_post(handler: BaseHTTPRequestHandler, path: str, body: Dict[str, obje
             token = str(phase_value or "").strip().lower()
             if token in {"prepare_prompts", "generate_videos", "upload_videos"}:
                 reset_steps = False
-        actual_flow = status_service.WORKFLOW_TO_FLOW_MAP.get(workflow, workflow)
-        status_service.mark_flow_running(project, actual_flow, steps, reset_steps=reset_steps)
-        _schedule_job_timeout(job.get("id", ""), project, actual_flow, steps)
+        status_service.mark_flow_running(project, workflow, steps, reset_steps=reset_steps)
+        _schedule_job_timeout(job.get("id", ""), project, workflow, steps)
         send_json(handler, HTTPStatus.OK, job)
         return True
     if path.startswith("/api/projects/") and path.endswith("/regenerate/character"):

@@ -1913,10 +1913,8 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
     emit_event(
         "INFO",
         "visual_audio_assets",
-        "phase_start",
-        "phase_assets_generation",
-        step="step_upload",
-        phase="step_upload",
+        "log",
+        "phase_assets_generation started",
         project=project_name,
     )
     emit_event(
@@ -2605,10 +2603,8 @@ async def main(project_name: Optional[str] = None, assets_dir: Optional[str] = N
     emit_event(
         "INFO",
         "visual_audio_assets",
-        "phase_complete",
+        "log",
         "phase_assets_generation completed",
-        step="step_upload",
-        phase="step_upload",
         project=project_name,
     )
     if full_phase_run:
